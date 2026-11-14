@@ -66,6 +66,9 @@
   .plaats-text { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; line-height: 19px; }
   .plaats-text span { font-size: 13px; color: #C9D6CD; }
   .plaats .btn.secondary { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+  .richting-pin { background: none; border: none; }
+  .richting-pin span { display: block; width: 22px; height: 22px; margin: 7px; border: 3px solid #18251C; border-radius: 50%; background: #FFFFFF; box-sizing: border-box; box-shadow: 0 1px 4px rgba(0,0,0,.45); }
+  .pop .hint { margin-top: 8px; font-size: 12px; line-height: 17px; color: var(--muted); max-width: 240px; }
   .foto-pin { background: none; border: none; }
   .foto-pin span { display: flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 2px solid #fff; border-radius: 50%; background: #18251C; color: #fff; font-size: 13px; font-weight: 700; box-sizing: border-box; }
   .pop img { display: block; width: 220px; max-width: 62vw; border-radius: 8px; }
@@ -409,12 +412,47 @@
   }
 
   // ---------- tuindelen ----------
+  var SPLIT_WIDTH = 1; // meter: een strook smaller dan dit telt als splitsing tussen tuindelen
+  function polys(f) {
+    if (!f || !f.geometry) return [];
+    var g = f.geometry;
+    if (g.type === 'Polygon') return [turf.polygon(g.coordinates)];
+    if (g.type === 'MultiPolygon') return g.coordinates.map(function (c) { return turf.polygon(c); });
+    return [];
+  }
+  function safeUnion(a, b) { try { return turf.union(a, b); } catch (e) { return a; } }
+  // Splitst de tuin in delen. Smalle stroken (< SPLIT_WIDTH) langs het huis verbinden geen tuindelen:
+  // eerst de tuin een halve meter laten krimpen en weer groeien (smalle stroken verdwijnen),
+  // daarna de randjes die daarbij wegvielen teruggeven aan het tuindeel waar ze tegenaan liggen.
   function splitParts(tuin) {
-    if (!tuin || !tuin.geometry) return [];
-    var g = tuin.geometry, parts = [];
-    if (g.type === 'Polygon') parts = [turf.polygon(g.coordinates)];
-    else if (g.type === 'MultiPolygon') parts = g.coordinates.map(function (c) { return turf.polygon(c); });
-    return parts.filter(function (p) { return turf.area(p) >= 3; });
+    var raw = polys(tuin).filter(function (p) { return turf.area(p) >= 3; });
+    var seeds = [];
+    try {
+      var r = SPLIT_WIDTH / 2;
+      var krimp = turf.buffer(tuin, -r, { units: 'meters' });
+      if (krimp && krimp.geometry) {
+        var groei = turf.buffer(krimp, r, { units: 'meters' });
+        polys(groei).forEach(function (s) {
+          var clip = safeIntersect(s, tuin);
+          if (clip && turf.area(clip) >= 3) seeds.push(clip);
+        });
+      }
+    } catch (e) { seeds = []; }
+    if (seeds.length <= raw.length) return raw;
+    var rest = tuin;
+    seeds.forEach(function (s) { if (rest) rest = safeDifference(rest, s); });
+    polys(rest).forEach(function (bit) {
+      var grown;
+      try { grown = turf.buffer(bit, 0.05, { units: 'meters' }); } catch (e) { return; }
+      if (!grown) return;
+      var touch = [];
+      seeds.forEach(function (s, i) {
+        try { if (turf.booleanIntersects(grown, s)) touch.push(i); } catch (e) {}
+      });
+      // Raakt het randje precies één tuindeel, dan hoort het daarbij. Raakt het er meer (de smalle verbindingsstrook), dan laten we het weg.
+      if (touch.length === 1) seeds[touch[0]] = safeUnion(seeds[touch[0]], bit);
+    });
+    return seeds;
   }
   function functie(f) {
     var p = f.properties || {};
@@ -698,10 +736,14 @@
       drawPhotos();
       setMode('kijk', ph);
     } else {
-      ph.kijk = p;
+      ph.kijk = normKijk(ph.stand, p);
       state.queue.shift();
       drawPhotos(); renderThumbs();
       nextPlacement();
+      if (!state.mode && !state.tipGezien) {
+        state.tipGezien = true;
+        setStatus('Tip: sleep het witte bolletje om de kijkrichting te draaien, of de genummerde stip om de foto te verplaatsen.');
+      }
     }
   });
   $('plaats-skip').addEventListener('click', function () {
@@ -710,14 +752,22 @@
     nextPlacement();
   });
 
-  function viewCone(stand, kijk) {
+  // Kijkpunt op 4–30 m van de standplaats, in de gekozen richting.
+  function normKijk(stand, kijk) {
+    var from = turf.point(stand), to = turf.point(kijk);
+    var dist = turf.distance(from, to, { units: 'meters' });
+    if (dist < 0.01) return turf.destination(from, 10, 0, { units: 'meters' }).geometry.coordinates;
+    var d = Math.max(4, Math.min(30, dist));
+    return turf.destination(from, d, turf.bearing(from, to), { units: 'meters' }).geometry.coordinates;
+  }
+  function toLL(c) { return [c[1], c[0]]; }
+  function coneLatLngs(stand, kijk) {
     var from = turf.point(stand), to = turf.point(kijk);
     var bearing = turf.bearing(from, to);
     var dist = Math.max(4, Math.min(30, turf.distance(from, to, { units: 'meters' })));
-    var pts = [stand];
-    for (var a = -25; a <= 25; a += 5) pts.push(turf.destination(from, dist, bearing + a, { units: 'meters' }).geometry.coordinates);
-    pts.push(stand);
-    return turf.polygon([pts]);
+    var pts = [toLL(stand)];
+    for (var a = -25; a <= 25; a += 5) pts.push(toLL(turf.destination(from, dist, bearing + a, { units: 'meters' }).geometry.coordinates));
+    return pts;
   }
 
   function drawPhotos() {
@@ -725,22 +775,41 @@
     state.photos.forEach(function (ph) {
       ph._marker = null;
       if (!ph.stand) return;
+      var cone = null, handle = null;
       if (ph.kijk) {
-        L.geoJSON(viewCone(ph.stand, ph.kijk), {
-          pane: 'foto', interactive: false,
-          style: { color: '#FFFFFF', weight: 1, fillColor: '#FFFFFF', fillOpacity: 0.28 }
+        cone = L.polygon(coneLatLngs(ph.stand, ph.kijk), {
+          pane: 'foto', interactive: false, color: '#FFFFFF', weight: 1, fillColor: '#FFFFFF', fillOpacity: 0.28
         }).addTo(fotoLayer);
+        // wit bolletje aan het eind van de kijkhoek: slepen = kijkrichting draaien
+        handle = L.marker(toLL(ph.kijk), {
+          draggable: true, keyboard: true, title: 'Kijkrichting van foto ' + photoNr(ph) + ' (slepen om te draaien)',
+          icon: L.divIcon({ className: 'richting-pin', html: '<span></span>', iconSize: [36, 36], iconAnchor: [18, 18] })
+        }).addTo(fotoLayer);
+        handle.on('drag', function () {
+          var ll = handle.getLatLng();
+          ph.kijk = [ll.lng, ll.lat];
+          cone.setLatLngs(coneLatLngs(ph.stand, ph.kijk));
+        });
+        handle.on('dragend', function () {
+          ph.kijk = normKijk(ph.stand, ph.kijk);
+          handle.setLatLng(toLL(ph.kijk));
+          cone.setLatLngs(coneLatLngs(ph.stand, ph.kijk));
+        });
       }
-      var mk = L.marker([ph.stand[1], ph.stand[0]], {
-        draggable: true, keyboard: true, title: 'Foto ' + photoNr(ph),
+      var mk = L.marker(toLL(ph.stand), {
+        draggable: true, keyboard: true, title: 'Foto ' + photoNr(ph) + ' (slepen om te verplaatsen)',
         icon: L.divIcon({ className: 'foto-pin', html: '<span>' + photoNr(ph) + '</span>', iconSize: [28, 28], iconAnchor: [14, 14] })
       });
-      mk.on('dragend', function () {
+      var start = null;
+      mk.on('dragstart', function () { start = { stand: ph.stand.slice(), kijk: ph.kijk ? ph.kijk.slice() : null }; });
+      mk.on('drag', function () {
         var ll = mk.getLatLng();
-        var dLon = ll.lng - ph.stand[0], dLat = ll.lat - ph.stand[1];
         ph.stand = [ll.lng, ll.lat];
-        if (ph.kijk) ph.kijk = [ph.kijk[0] + dLon, ph.kijk[1] + dLat];
-        drawPhotos();
+        if (start && start.kijk) {
+          ph.kijk = [start.kijk[0] + ll.lng - start.stand[0], start.kijk[1] + ll.lat - start.stand[1]];
+          if (cone) cone.setLatLngs(coneLatLngs(ph.stand, ph.kijk));
+          if (handle) handle.setLatLng(toLL(ph.kijk));
+        }
       });
       mk.bindPopup(function () { return popupEl(ph); }, { maxWidth: 260 });
       mk.addTo(fotoLayer);
@@ -765,6 +834,13 @@
       chips.appendChild(c);
     });
     box.appendChild(chips);
+    box.appendChild(el('div', { className: 'hint' }, 'Sleep het witte bolletje om de kijkrichting te draaien, of de genummerde stip om de foto te verplaatsen.'));
+    var turn = el('button', { type: 'button', className: 'del', style: 'color:#2D6A4F' }, 'Kijkrichting aanwijzen');
+    turn.addEventListener('click', function () {
+      map.closePopup();
+      state.queue = [ph.id].concat(state.queue.filter(function (q) { return q !== ph.id; }));
+      setMode('kijk', ph);
+    });
     var again = el('button', { type: 'button', className: 'del', style: 'color:#2D6A4F' }, 'Opnieuw plaatsen');
     again.addEventListener('click', function () {
       map.closePopup();
@@ -778,7 +854,8 @@
       map.closePopup();
       removePhoto(ph.id);
     });
-    var row = el('div', { style: 'display:flex; gap:16px' });
+    var row = el('div', { style: 'display:flex; flex-wrap:wrap; column-gap:16px' });
+    row.appendChild(turn);
     row.appendChild(again);
     row.appendChild(del);
     box.appendChild(row);

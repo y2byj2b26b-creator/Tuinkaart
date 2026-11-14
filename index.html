@@ -95,6 +95,10 @@
   .lees-card { flex: 1 1 300px; min-width: 0; }
   .lees-wrap { position: relative; border-radius: 12px; overflow: hidden; background: #111; }
   .lees-wrap img { display: block; width: 100%; height: auto; }
+  .lucht-wrap { position: relative; width: fit-content; max-width: 100%; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #111; }
+  .lucht-wrap[hidden] { display: none; }
+  .lucht-wrap img { display: block; max-width: 100%; max-height: 62vh; width: auto; height: auto; }
+  .lucht-wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   #lees-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
   /* illustratie */
   .illus-card { flex: 999 1 560px; min-width: 0; }
@@ -122,7 +126,7 @@
 <body>
 <header>
   <h1>Tuinkaart · je tuin in kaart</h1>
-  <p class="sub">Zoek je adres, kies je tuin en voeg foto's toe. De app leest de foto's uit en tekent je tuin onderaan de pagina.</p>
+  <p class="sub">Zoek je adres en kies je tuin. De app maakt meteen een plattegrond uit de luchtfoto; met foto's vul je hem aan. De tekening staat onderaan de pagina.</p>
   <div id="update" class="update" hidden role="status"><span>Er is een nieuwe versie van de app.</span><button id="update-btn" class="btn small" type="button">Nu laden</button></div>
 </header>
 
@@ -181,7 +185,7 @@
     </section>
 
     <section class="card" id="key-card" aria-labelledby="t-key">
-      <h2 id="t-key">Foto's laten uitlezen</h2>
+      <h2 id="t-key">Luchtfoto en foto's laten uitlezen</h2>
       <p class="note">De app gebruikt Google Gemini (gratis variant). Maak een sleutel aan op <a href="https://aistudio.google.com/apikey">aistudio.google.com</a> en plak hem hier. Hij wordt alleen op dit toestel bewaard.</p>
       <div class="field">
         <label for="key">Gemini API-sleutel</label>
@@ -196,7 +200,7 @@
 
     <section class="card" id="foto-card" aria-labelledby="t-fotos" hidden>
       <h2 id="t-fotos">Foto's van <span id="foto-zone">je tuin</span></h2>
-      <p class="note">Maak of kies een foto met de hele tuin erop, het liefst vanuit een raam op de verdieping, met de schuttingen links en rechts en de achterkant van de tuin in beeld. Daarna tik je op de kaart waar je stond en waar je naartoe keek. De app rekent dan de foto om naar de plattegrond.</p>
+      <p class="note">Niet verplicht: foto's vullen de plattegrond uit de luchtfoto aan met wat je van boven niet ziet, zoals het soort tegel, de schutting en wat er veranderd is. Fotografeer het liefst vanuit een raam op de verdieping en tik daarna op de kaart waar je stond en waar je naartoe keek.</p>
       <div class="row">
         <label class="btn" for="foto-input">Foto's toevoegen</label>
         <input id="foto-input" class="sr" type="file" accept="image/*" multiple>
@@ -216,6 +220,13 @@
   </aside>
 
   <div class="full">
+    <section class="card lees-card" id="lucht-card" aria-labelledby="t-lucht" hidden>
+      <h2 id="t-lucht">Eerste plattegrond uit de luchtfoto</h2>
+      <div class="lucht-wrap" id="lucht-wrap" hidden><img id="lucht-img" alt="Luchtfoto van je tuin met wat de app herkent"><svg id="lucht-svg" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"></svg></div>
+      <p class="note" id="lucht-note" style="margin-top:8px"></p>
+      <div class="row"><button class="btn secondary small" id="lucht-again" type="button">Opnieuw uitlezen</button></div>
+    </section>
+
     <section class="card lees-card" id="lees-card" aria-labelledby="t-lees" hidden>
       <h2 id="t-lees">Zo leest de app je foto</h2>
       <div class="lees-wrap"><img id="lees-img" alt="Foto van je tuin met wat de app herkent"><svg id="lees-svg" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"></svg></div>
@@ -264,7 +275,7 @@
   var BAG_WFS = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
   var GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/';
   // Lichtste Gemini-modellen die gratis zijn en foto's kunnen lezen (stand nov. 2026), in volgorde van voorkeur.
-  var APP_VERSION = 7;
+  var APP_VERSION = 8;
   // Voor het uitlezen van foto's: eerst Gemini Flash (beter ruimtelijk inzicht), bij de limiet terugvallen op Flash-Lite. Allemaal gratis in de free tier (stand nov. 2026).
   var MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   var KEY_STORE = 'tuinkaart.geminiKey', MODEL_STORE = 'tuinkaart.geminiModel.v6';
@@ -375,7 +386,7 @@
   var state = newState();
   var zoneSeq = 0, photoSeq = 0, objSeq = 0;
   var aiQueue = [], aiRunning = false;
-  function newState() { return { zones: [], photos: [], objects: [], queue: [], mode: null, wegen: [], selObj: null, editObj: null }; }
+  function newState() { return { zones: [], photos: [], objects: [], queue: [], mode: null, wegen: [], selObj: null, editObj: null, lucht: {} }; }
 
   // ================= hulpfuncties =================
   function setStatus(msg, isError) { var e = $('status'); e.textContent = msg || ''; e.className = 'status' + (isError ? ' error' : ''); }
@@ -634,6 +645,7 @@
     state.selected = id;
     state.selObj = null;
     drawZones(); renderZones(); renderThumbs(); drawPhotos(); renderObjects(); renderIllustration(); showFacts(); renderLees();
+    maybeLucht();
   }
   function drawZones() {
     tuinLayer.clearLayers();
@@ -697,6 +709,7 @@
       $('edit').disabled = !(state.grens.pm);
       $('reset').disabled = false;
       recompute();
+      maybeLucht();
     } else {
       $('edit').disabled = true; $('reset').disabled = true;
       state.zones = []; tuinLayer.clearLayers(); renderZones(); showFacts(); renderIllustration();
@@ -734,17 +747,28 @@
     memKey = v; lsSet(KEY_STORE, v);
     showKeyStatus();
     state.photos.forEach(function (ph) { if (ph.ai && (ph.ai.status === 'nokey' || ph.ai.status === 'fout')) queueAnalysis(ph); });
+    var zl = getZone(state.selected);
+    if (zl && state.lucht[zl.id] && (state.lucht[zl.id].status === 'nokey' || state.lucht[zl.id].status === 'fout')) { delete state.lucht[zl.id]; }
+    maybeLucht();
   });
   $('key-clear').addEventListener('click', function () { memKey = ''; lsSet(KEY_STORE, ''); lsSet(MODEL_STORE, ''); showKeyStatus(); });
   showKeyStatus();
 
   // ================= Gemini aanroepen =================
-  function geminiBody(img, withSchema) {
+  function geminiBody(img, withSchema, opts) {
+    opts = opts || {};
     var cfg = { responseMimeType: 'application/json', temperature: 0.2 };
-    if (withSchema) cfg.responseSchema = SCHEMA;
-    return { contents: [{ role: 'user', parts: [{ text: PROMPT }, { inlineData: { mimeType: 'image/jpeg', data: img.b64 } }] }], generationConfig: cfg };
+    if (withSchema) cfg.responseSchema = opts.schema || SCHEMA;
+    return { contents: [{ role: 'user', parts: [{ text: opts.prompt || PROMPT }, { inlineData: { mimeType: 'image/jpeg', data: img.b64 } }] }], generationConfig: cfg };
   }
-  function parseGemini(j) {
+  function parseGemini(j, check) {
+    if (check) {
+      var c0 = j && j.candidates && j.candidates[0];
+      if (!c0 || !c0.content || !c0.content.parts) return null;
+      var t0 = c0.content.parts.filter(function (p) { return !p.thought; }).map(function (p) { return p.text || ''; }).join('').trim();
+      t0 = t0.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+      try { var o0 = JSON.parse(t0); return check(o0) ? o0 : null; } catch (e) { return null; }
+    }
     var c = j && j.candidates && j.candidates[0];
     if (!c || !c.content || !c.content.parts) return null;
     var t = c.content.parts.filter(function (p) { return !p.thought; }).map(function (p) { return p.text || ''; }).join('').trim();
@@ -757,7 +781,8 @@
     } catch (e) { return null; }
   }
   function isKeyError(status, msg) { return (status === 400 || status === 401 || status === 403) && /api key|api_key|key not valid|permission|unauthori|referer|referrer/i.test(msg); }
-  function callGemini(img) {
+  function callGemini(img, opts) {
+    opts = opts || {};
     if (typeof img === 'string') img = { b64: img, w: 1000, h: 1000 };
     var key = getKey();
     if (!key) return Promise.reject(new Error('geen-sleutel'));
@@ -768,12 +793,12 @@
       if (i >= order.length) return Promise.reject(lastErr || new Error('Geen Gemini-model beschikbaar'));
       var model = order[i];
       return fetch(GEMINI + model + ':generateContent?key=' + encodeURIComponent(key), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody(img, withSchema))
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody(img, withSchema, opts))
       }).then(function (r) {
         return r.text().then(function (t) { var j = {}; try { j = JSON.parse(t); } catch (e) {} return { r: r, j: j }; });
       }).then(function (x) {
         if (x.r.ok) {
-          var out = parseGemini(x.j);
+          var out = parseGemini(x.j, opts.check);
           if (out) { lsSet(MODEL_STORE, model); out.model = model; return out; }
           lastErr = new Error('Gemini gaf geen bruikbaar antwoord');
           return withSchema ? attempt(i, false) : attempt(i + 1, true);
@@ -1014,7 +1039,8 @@
     var bearing = o.frameBearing !== undefined ? o.frameBearing : quantBearing(zone, defaultBearing(zone));
     var F = frameOf(zone, bearing);
     if (o.groep === 'erfafscheiding') {
-      var edges = o.side && !o.userMoved ? sideEdges(zone, F, o.side) : [];
+      var edges = o.fixedEdges ? fenceEdges(zone).filter(function (e) { return o.fixedEdges.indexOf(e.key) !== -1; }) : [];
+      if (!edges.length) edges = o.side && !o.userMoved ? sideEdges(zone, F, o.side) : [];
       if (!edges.length) { var e = nearestEdge(zone, o.pos); if (e) edges = [e]; }
       o.edgeKeys = edges.map(function (x) { return x.key; });
       o.geom = edges.length ? turf.multiLineString(edges.map(function (x) { return [x.a, x.b]; })) : null;
@@ -1150,9 +1176,20 @@
       var m = findMatch(o);
       if (m) {
         if (m.photos.indexOf(ph.id) === -1) m.photos.push(ph.id);
-        ['materiaal', 'formaat', 'kleur'].forEach(function (k) { if (!m[k] && o[k]) m[k] = o[k]; });
+        // Materiaal en kleur zie je beter op een foto dan van boven.
+        var fotoWint = m.src === 'lucht' && m.status !== 'bevestigd';
+        ['materiaal', 'formaat', 'kleur'].forEach(function (k) { if (o[k] && (!m[k] || fotoWint)) m[k] = o[k]; });
         if (!m.hoogte && o.hoogte) m.hoogte = o.hoogte;
-      } else { state.objects.push(o); nieuw++; }
+        if (m.src === 'lucht' && GROEP_INFO[m.groep] && m.naam === GROEP_INFO[m.groep].label && o.naam) m.naam = o.naam;
+      } else {
+        // Ligt dit vlak grotendeels op iets uit de luchtfoto of iets wat je zelf hebt getekend? Dan niet dubbel tekenen.
+        // (Een pergola op een terras is geen botsing: bouwwerken en grondvlakken mogen over elkaar.)
+        var laag = function (g) { return g === 'bouwwerk' || g === 'open_bouwwerk' ? 'bouw' : (g === 'boom' || g === 'erfafscheiding' ? null : 'grond'); };
+        var botsing = o.geom && laag(o.groep) && state.objects.some(function (x) {
+          return x.zone === o.zone && (x.src === 'lucht' || x.userEdited) && x.geom && laag(x.groep) === laag(o.groep) && overlapRatio(x.geom, o.geom) > 0.6;
+        });
+        if (!botsing) { state.objects.push(o); nieuw++; }
+      }
     });
     ph.ai.nieuw = nieuw;
     renderObjects(); renderIllustration(); renderThumbs();
@@ -1401,9 +1438,11 @@
     var q = ring.slice(0, -1).map(function (p) { return toUV(F, p); });
     var hoekig = groep === 'bouwwerk' || groep === 'open_bouwwerk' || groep === 'verharding' || groep === 'overig';
     var A = polyAreaXY(q);
-    if (hoekig && A > 0.3) {
+    if (A > 0.3) {
+      // Bijna rechthoekig? Dan een strakke rechthoek (ook een rechthoekig gazon of border).
+      var drempel = groep === 'verharding' ? 0.8 : (hoekig ? 0.72 : 0.9);
       var r = minRectXY(q);
-      if (r && r.ar > 0 && A / r.ar > (groep === 'verharding' ? 0.8 : 0.72)) {
+      if (r && r.ar > 0 && A / r.ar > drempel) {
         // Bijna recht met de tuin mee? Dan precies recht zetten.
         var a = r.a, k = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
         if (Math.abs(a - k) < 9 * Math.PI / 180) {
@@ -1426,8 +1465,8 @@
     var line = turf.lineString(closeRing(q));
     var simp = turf.simplify(line, { tolerance: 0.15, highQuality: true }).geometry.coordinates.slice(0, -1);
     if (simp.length < 3) return ring;
-    var zacht = 1;
-    var sm = chaikin(simp, zacht);
+    // Alleen zachte randen bij echt ronde vormen (veel punten); een vijfhoek blijft een vijfhoek.
+    var sm = simp.length >= 6 ? chaikin(simp, 1) : simp;
     return closeRing(sm.map(function (p) { return fromUV(F, p[0], p[1]); }));
   }
   function makeObjectFromCam(it, ph, zone, idx, groep, soort, naam) {
@@ -1753,6 +1792,7 @@
     else if (o.groep !== 'erfafscheiding' && o.bagIdx === undefined) d.push('ca. ' + num(o.w) + ' × ' + num(o.d) + ' m');
     if (o.bagIdx !== undefined) d.push('vorm uit de BAG');
     if (o.plekOnbekend) d.push('plek geschat');
+    if (o.src === 'lucht' && !o.userEdited) d.push('uit luchtfoto');
     return d.join(' · ');
   }
   function fillColor(o) {
@@ -2106,6 +2146,266 @@
     svg.addEventListener('pointercancel', function () { drag = null; renderIllustration(); });
   })();
 
+
+  // ================= eerste plattegrond uit de luchtfoto =================
+  // De luchtfoto is al een plattegrond: recht van boven, op schaal en precies passend op het Kadaster.
+  // De app knipt de tuin uit, maakt alles buiten de erfgrens donker en laat Gemini de vlakken aanwijzen.
+  var LUCHT_PROMPT = [
+    'Je krijgt een LUCHTFOTO van één Nederlandse tuin, recht van boven gefotografeerd, met het noorden boven. De foto is in het vroege voorjaar gemaakt: bomen hebben nog geen blad en gras kan dof of bruingroen zijn.',
+    'De tuin is het heldere deel BINNEN de gele lijn. Alles wat donker is gemaakt (buiten de gele lijn) hoort er niet bij.',
+    'Schaal: 1 pixel is ongeveer {CM} cm. De tuin is ongeveer {MAAT}.',
+    'Gebruik BEELDCOÖRDINATEN: x van 0 (linkerrand) tot 1000 (rechterrand), y van 0 (bovenrand) tot 1000 (onderrand). Elk punt is {"x": .., "y": ..}.',
+    '',
+    '1. vlakken: deel het grondoppervlak binnen de gele lijn op in vlakken die samen zoveel mogelijk van de tuin bedekken en elkaar niet overlappen:',
+    '- gazon (gras); beplanting (borders, struiken, plantvakken, moestuin; geen plantensoorten); verharding (terras, pad, oprit, grind, vlonder; met materiaal en kleur als je dat ziet); bouwwerk (schuur, berging, tuinhuis, overkapping met dicht dak); open_bouwwerk (pergola, carport); water (vijver); overig.',
+    '- omtrek: 4 tot 20 punten langs de rand van het vlak. Volg bochten en ronde vormen; rechte randen mogen met weinig punten.',
+    '2. bomen: stam = het midden van de boom (de stam als je die ziet), kruin_m = doorsnede van de kruin in meters. Kale bomen zie je als een web van takken, vaak met een lange schaduw.',
+    '3. afscheidingen: schutting, haag, muur of hek langs de gele lijn: soort en 2 tot 6 punten langs het verloop.',
+    '',
+    'Let op:',
+    '- Schaduw is geen apart vlak. Kijk door de schaduw heen naar wat eronder ligt (gras, tegels, grind).',
+    '- Negeer losse spullen (tuinmeubels, trampolines, parasols, speelgoed, auto\'s, containers) en het huis.',
+    '- Een schuur herken je aan een plat of schuin dak met rechte randen, vaak met een schaduw ernaast.',
+    '- Maximaal 20 vlakken. Korte Nederlandse namen, zoals "Gazon", "Terras", "Pad", "Border links", "Schuur". Antwoord alleen met JSON volgens het schema.'
+  ].join('\n');
+  var LUCHT_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+      vlakken: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+        groep: { type: 'STRING', format: 'enum', enum: ['gazon', 'beplanting', 'verharding', 'bouwwerk', 'open_bouwwerk', 'water', 'overig'] },
+        soort: { type: 'STRING' }, naam: { type: 'STRING' }, materiaal: { type: 'STRING' }, kleur: { type: 'STRING' }, omtrek: PTS
+      }, required: ['groep', 'naam', 'omtrek'] } },
+      bomen: { type: 'ARRAY', items: { type: 'OBJECT', properties: { naam: { type: 'STRING' }, stam: PT, kruin_m: { type: 'NUMBER' } }, required: ['stam'] } },
+      afscheidingen: { type: 'ARRAY', items: { type: 'OBJECT', properties: { soort: { type: 'STRING' }, naam: { type: 'STRING' }, punten: PTS }, required: ['soort', 'punten'] } },
+      opmerking: { type: 'STRING' }
+    },
+    required: ['vlakken']
+  };
+  var LUCHT_LAYER = 'Actueel_orthoHR';
+  function tileUrl(z, x, y) { return luchtfoto(LUCHT_LAYER).replace('{z}', z).replace('{x}', x).replace('{y}', y); }
+  function loadImg(blob) {
+    return new Promise(function (res, rej) {
+      var u = URL.createObjectURL(blob), im = new Image();
+      im.onload = function () { res(im); setTimeout(function () { URL.revokeObjectURL(u); }, 1000); };
+      im.onerror = function () { URL.revokeObjectURL(u); rej(new Error('tegel')); };
+      im.src = u;
+    });
+  }
+  var fetchTile = function (url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); }).then(loadImg);
+  };
+  // Knipt de luchtfoto uit rond de tuin (met 1,5 m rand) en geeft het canvas met de omrekening terug.
+  function luchtCrop(zone) {
+    var bb = turf.bbox(turf.buffer(zone.geom, 1.5, { units: 'meters' }));
+    function tryZoom(Z) {
+      var p0 = map.project(L.latLng(bb[3], bb[0]), Z), p1 = map.project(L.latLng(bb[1], bb[2]), Z);
+      var x0 = Math.floor(p0.x), y0 = Math.floor(p0.y), x1 = Math.ceil(p1.x), y1 = Math.ceil(p1.y);
+      var tx0 = Math.floor(x0 / 256), tx1 = Math.floor((x1 - 1) / 256), ty0 = Math.floor(y0 / 256), ty1 = Math.floor((y1 - 1) / 256);
+      if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 36 && Z > 17) return tryZoom(Z - 1);
+      var c = document.createElement('canvas'); c.width = x1 - x0; c.height = y1 - y0;
+      var ctx = c.getContext('2d'), jobs = [];
+      ctx.fillStyle = '#777'; ctx.fillRect(0, 0, c.width, c.height);
+      for (var tx = tx0; tx <= tx1; tx++) for (var ty = ty0; ty <= ty1; ty++) (function (tx, ty) {
+        jobs.push(fetchTile(tileUrl(Z, tx, ty)).then(function (im) { ctx.drawImage(im, tx * 256 - x0, ty * 256 - y0); }));
+      })(tx, ty);
+      return Promise.all(jobs).then(function () {
+        var lat = (bb[1] + bb[3]) / 2;
+        return { canvas: c, Z: Z, x0: x0, y0: y0, cw: c.width, ch: c.height, mpp: 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, Z) };
+      }, function (e) { if (Z > 19) return tryZoom(Z - 1); throw e; });
+    }
+    return tryZoom(21);
+  }
+  function luchtToPx(L0, p) { var q = map.project(L.latLng(p[1], p[0]), L0.Z); return [q.x - L0.x0, q.y - L0.y0]; }
+  function luchtToGeo(L0, q) {
+    var x = Number(q && q.x), y = Number(q && q.y);
+    if (!isFinite(x) || !isFinite(y)) return null;
+    var ll = map.unproject(L.point(L0.x0 + x / 1000 * L0.cw, L0.y0 + y / 1000 * L0.ch), L0.Z);
+    return [ll.lng, ll.lat];
+  }
+  function zonePath(ctx, L0, zone, sc) {
+    polys(zone.geom).forEach(function (pg) {
+      pg.geometry.coordinates.forEach(function (ring) {
+        ring.forEach(function (p, i) { var q = luchtToPx(L0, p); if (i) ctx.lineTo(q[0] * sc, q[1] * sc); else ctx.moveTo(q[0] * sc, q[1] * sc); });
+        ctx.closePath();
+      });
+    });
+  }
+  // Beeld voor Gemini: buiten de erfgrens donker, de grens geel.
+  function luchtAiImage(L0, zone) {
+    var sc = Math.min(2.5, 1024 / Math.max(L0.cw, L0.ch));
+    var c = document.createElement('canvas'); c.width = Math.round(L0.cw * sc); c.height = Math.round(L0.ch * sc);
+    var ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(L0.canvas, 0, 0, c.width, c.height);
+    ctx.beginPath(); ctx.rect(0, 0, c.width, c.height); zonePath(ctx, L0, zone, sc);
+    ctx.fillStyle = 'rgba(0,0,0,0.62)'; ctx.fill('evenodd');
+    ctx.beginPath(); zonePath(ctx, L0, zone, sc);
+    ctx.strokeStyle = '#FFD60A'; ctx.lineWidth = Math.max(2, 3 * sc / 2); ctx.stroke();
+    return { b64: c.toDataURL('image/jpeg', 0.9).split(',')[1], w: c.width, h: c.height, cm: L0.mpp / sc * 100 };
+  }
+  function zoneMaat(zone) {
+    var F = frameOf(zone, quantBearing(zone, defaultBearing(zone)));
+    return (Math.round(F.W * 10) / 10) + ' bij ' + (Math.round(F.D * 10) / 10) + ' meter (' + Math.round(zone.area) + ' m²)';
+  }
+  function maybeLucht() {
+    var zone = getZone(state.selected);
+    if (!zone) { renderLucht(); return; }
+    var cur = state.lucht[zone.id];
+    if (cur && cur.status !== 'nokey') { renderLucht(); return; }
+    if (!getKey()) { state.lucht[zone.id] = { status: 'nokey' }; renderLucht(); return; }
+    runLucht(zone);
+  }
+  function runLucht(zone) {
+    var job = { status: 'laden' };
+    state.lucht[zone.id] = job;
+    renderLucht();
+    Promise.resolve().then(function () { return luchtCrop(zone); }).then(function (L0) {
+      if (state.lucht[zone.id] !== job) return null;
+      job.L = L0;
+      job.url = L0.canvas.toDataURL('image/jpeg', 0.85);
+      job.status = 'bezig';
+      renderLucht();
+      var img = luchtAiImage(L0, zone);
+      var prompt = LUCHT_PROMPT.replace('{CM}', String(Math.round(img.cm * 10) / 10)).replace('{MAAT}', zoneMaat(zone));
+      return callGemini(img, { prompt: prompt, schema: LUCHT_SCHEMA, check: function (o) { return o && Array.isArray(o.vlakken); } });
+    }).then(function (res) {
+      if (!res || state.lucht[zone.id] !== job) return;
+      job.raw = res; job.status = 'klaar'; job.model = res.model;
+      placeFromLucht(zone, job);
+    }).catch(function (err) {
+      if (state.lucht[zone.id] !== job) return;
+      console.warn(err);
+      job.status = err && err.message === 'geen-sleutel' ? 'nokey' : 'fout';
+      job.msg = job.L ? friendlyError(err) : 'De luchtfoto kon niet worden geladen. Controleer je internet en probeer het opnieuw.';
+    }).then(function () {
+      if (state.lucht[zone.id] === job) { renderLucht(); renderObjects(); renderIllustration(); }
+    });
+  }
+  function luchtBase(zone, groep, soort, naam, it) {
+    var def = SOORT_MAAT[soort] || GROEP_MAAT[groep] || [1.5, 1.5];
+    return {
+      id: 'o' + (++objSeq), zone: zone.id, photos: [], src: 'lucht', groep: groep, soort: soort, naam: naam,
+      materiaal: String(it.materiaal || ''), formaat: String(it.formaat || ''), kleur: String(it.kleur || ''), hoogte: null,
+      w: def[0], d: def[1], status: 'voorstel', frameBearing: quantBearing(zone, defaultBearing(zone)), plekOnbekend: false
+    };
+  }
+  function cleanName(n, fallback) { n = String(n || '').trim(); return n ? cap(n) : fallback; }
+  function placeFromLucht(zone, job) {
+    var L0 = job.L, raw = job.raw || {}, F = frameOf(zone, quantBearing(zone, defaultBearing(zone)));
+    // eerdere voorstellen uit de luchtfoto voor deze tuin vervangen (zelf aangepaste blijven)
+    state.objects = state.objects.filter(function (o) { return !(o.zone === zone.id && o.src === 'lucht' && o.status === 'voorstel' && !o.userEdited && !o.userMoved && !o.resized); });
+    var nieuw = [];
+    (raw.vlakken || []).slice(0, 24).forEach(function (it) {
+      var groep = normGroep(it.groep);
+      if (!groep || groep === 'boom' || groep === 'erfafscheiding') return;
+      var soort = String(it.soort || '').toLowerCase().trim() || groep;
+      var naam = cleanName(it.naam, GROEP_INFO[groep].label);
+      if (LOS.test((soort + ' ' + naam).toLowerCase())) return;
+      var ring = (Array.isArray(it.omtrek) ? it.omtrek : []).map(function (q) { return luchtToGeo(L0, q); }).filter(Boolean);
+      if (ring.length < 3) return;
+      var o = luchtBase(zone, groep, soort, naam, it);
+      o.fixed = closeRing(ring);
+      try { o.fixed = tidyRing(o.fixed, groep, F); } catch (e) {}
+      if (groep === 'bouwwerk') {
+        var m = bagMatch(turf.centroid(turf.polygon([o.fixed])).geometry.coordinates);
+        if (m) { o.bagIdx = state.bebouwing.indexOf(m); }
+      }
+      updateGeom(o);
+      if (o.geom && turf.area(o.geom) >= 0.15) nieuw.push(o);
+    });
+    (raw.bomen || []).slice(0, 12).forEach(function (it) {
+      var p = luchtToGeo(L0, it.stam);
+      if (!p || !turf.booleanPointInPolygon(turf.point(p), turf.buffer(zone.geom, 0.5, { units: 'meters' }))) return;
+      var o = luchtBase(zone, 'boom', 'boom', cleanName(it.naam, 'Boom'), it);
+      o.fixedPos = p;
+      o.w = o.d = Math.min(15, Math.max(1.5, clampSize(it.kruin_m, 4)));
+      updateGeom(o);
+      nieuw.push(o);
+    });
+    var edges = fenceEdges(zone);
+    (raw.afscheidingen || []).slice(0, 8).forEach(function (it) {
+      var pts = (Array.isArray(it.punten) ? it.punten : []).map(function (q) { return luchtToGeo(L0, q); }).filter(Boolean);
+      if (!pts.length) return;
+      var keys = [];
+      pts.forEach(function (p) {
+        var best = null, bd = 1.5;
+        edges.forEach(function (e) { var d = turf.pointToLineDistance(turf.point(p), turf.lineString([e.a, e.b]), { units: 'meters' }); if (d < bd) { bd = d; best = e; } });
+        if (best && keys.indexOf(best.key) === -1) keys.push(best.key);
+      });
+      if (!keys.length) return;
+      var soort = String(it.soort || 'schutting').toLowerCase().trim();
+      var o = luchtBase(zone, 'erfafscheiding', soort, cleanName(it.naam, cap(soort)), it);
+      o.fixedEdges = keys;
+      o.pos = pts[Math.floor(pts.length / 2)];
+      updateGeom(o);
+      if (o.geom) nieuw.push(o);
+    });
+    // Wat al uit foto's kwam: de luchtfoto bepaalt de vorm, de foto mag de details aanvullen.
+    nieuw.forEach(function (o) {
+      var m = findMatch(o);
+      if (m && (m.userEdited || m.userMoved || m.status === 'bevestigd')) return;
+      if (m) {
+        ['materiaal', 'formaat', 'kleur'].forEach(function (k) { if (!o[k] && m[k]) o[k] = m[k]; });
+        if (!o.hoogte && m.hoogte) o.hoogte = m.hoogte;
+        o.photos = m.photos.slice();
+        state.objects = state.objects.filter(function (x) { return x !== m; });
+      }
+      state.objects.push(o);
+    });
+    job.nieuw = nieuw.length;
+  }
+  function renderLucht() {
+    var card = $('lucht-card'), zone = getZone(state.selected);
+    var job = zone ? state.lucht[zone.id] : null;
+    if (!job) { card.hidden = true; return; }
+    card.hidden = false;
+    $('lucht-again').hidden = job.status === 'laden' || job.status === 'bezig' || job.status === 'nokey';
+    var wrap = $('lucht-wrap');
+    wrap.hidden = !job.url;
+    if (job.url && $('lucht-img').getAttribute('src') !== job.url) $('lucht-img').src = job.url;
+    var out = '', L0 = job.L;
+    if (L0 && job.raw) {
+      var ry = (L0.cw / L0.ch).toFixed(3);
+      (job.raw.vlakken || []).forEach(function (it) {
+        var g = normGroep(it.groep);
+        if (!g || !Array.isArray(it.omtrek) || it.omtrek.length < 3) return;
+        var kleur = g === 'verharding' ? kleurHex(it.kleur, '#C9C3B6') : (GROEP_INFO[g] ? GROEP_INFO[g].kleur : '#999');
+        var pts = it.omtrek.map(function (q) { var x = Number(q.x), y = Number(q.y); return isFinite(x) && isFinite(y) ? x.toFixed(1) + ',' + y.toFixed(1) : null; }).filter(Boolean).join(' ');
+        out += '<polygon points="' + pts + '" fill="' + kleur + '" fill-opacity="0.45" stroke="' + shade(kleur, -0.4) + '" stroke-width="2" vector-effect="non-scaling-stroke"/>';
+      });
+      (job.raw.afscheidingen || []).forEach(function (it) {
+        var pts = (it.punten || []).map(function (q) { var x = Number(q.x), y = Number(q.y); return isFinite(x) && isFinite(y) ? x.toFixed(1) + ',' + y.toFixed(1) : null; }).filter(Boolean).join(' ');
+        if (pts) out += '<polyline points="' + pts + '" fill="none" stroke="#7B5A3C" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
+      });
+      (job.raw.bomen || []).forEach(function (it) {
+        var x = Number(it.stam && it.stam.x), y = Number(it.stam && it.stam.y);
+        if (!isFinite(x) || !isFinite(y)) return;
+        var r = Math.max(0.75, clampSize(it.kruin_m, 4) / 2) / L0.mpp / L0.cw * 1000;
+        out += '<ellipse cx="' + x + '" cy="' + y + '" rx="' + r.toFixed(1) + '" ry="' + (r * ry).toFixed(1) + '" fill="#2F6B3A" fill-opacity="0.35" stroke="#1F4A27" stroke-width="2" vector-effect="non-scaling-stroke"/>';
+      });
+    }
+    if (L0 && zone) {
+      polys(zone.geom).forEach(function (pg) {
+        var d = pg.geometry.coordinates[0].map(function (p, i) { var q = luchtToPx(L0, p); return (i ? 'L' : 'M') + (q[0] / L0.cw * 1000).toFixed(1) + ' ' + (q[1] / L0.ch * 1000).toFixed(1); }).join('') + 'Z';
+        out += '<path d="' + d + '" fill="none" stroke="#FFD60A" stroke-width="3" stroke-dasharray="8 6" vector-effect="non-scaling-stroke"/>';
+      });
+    }
+    $('lucht-svg').innerHTML = out;
+    var note = {
+      nokey: 'Voeg hieronder je Gemini-sleutel toe; dan maakt de app meteen een eerste plattegrond uit de luchtfoto.',
+      laden: 'Luchtfoto van je tuin ophalen…',
+      bezig: 'De luchtfoto wordt uitgelezen. Dit duurt meestal 10 tot 30 seconden.',
+      fout: 'Uitlezen lukte niet: ' + (job.msg || 'onbekende fout'),
+      klaar: (job.nieuw ? job.nieuw + ' vakken gevonden en in de tekening gezet. ' : 'Er is niets gevonden. ') + 'Klopt iets niet? Tik op het vak op de kaart en sleep de hoekpunten. Foto\'s van je tuin vullen aan wat je van boven niet ziet, zoals het soort tegel.'
+    }[job.status] || '';
+    $('lucht-note').textContent = note + (job.L ? ' Luchtfoto: Beeldmateriaal Nederland via PDOK, gemaakt in het voorjaar (bomen zonder blad).' : '');
+  }
+  $('lucht-again').addEventListener('click', function () {
+    var zone = getZone(state.selected);
+    if (!zone) return;
+    delete state.lucht[zone.id];
+    maybeLucht();
+  });
 
   // ================= vakken op de kaart aanpassen =================
   // Elk vak (gazon, pad, terras, border...) staat ook op de kaart. Tik erop en sleep de hoekpunten, net als bij de perceelgrens.

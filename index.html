@@ -75,6 +75,11 @@
   .plaats-text { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; line-height: 19px; }
   .plaats-text span { font-size: 13px; color: #C9D6CD; }
   .plaats .btn.secondary { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+  .vakbar { flex-wrap: wrap; }
+  #map.vak-bewerken .leaflet-foto-pane, #map.vak-bewerken .leaflet-tooltip-pane, #map.vak-bewerken .foto-pin, #map.vak-bewerken .richting-pin { display: none; }
+  .vakbar .plaats-text { flex-basis: 100%; }
+  .vakbar .btn { flex: 1; }
+  .vakbar .btn:not(.secondary) { background: #FFD60A; color: #18251C; border-color: #FFD60A; }
   .foto-pin { background: none; border: none; }
   .foto-pin span { display: flex; width: 28px; height: 28px; align-items: center; justify-content: center; border: 2px solid #fff; border-radius: 50%; background: #18251C; color: #fff; font-size: 13px; font-weight: 700; box-sizing: border-box; }
   .richting-pin { background: none; border: none; }
@@ -137,12 +142,18 @@
       <div class="plaats-text"><strong id="plaats-titel"></strong><span id="plaats-uitleg"></span></div>
       <button id="plaats-skip" class="btn secondary small" type="button">Overslaan</button>
     </div>
+    <div id="vak-bar" class="plaats vakbar" hidden role="status">
+      <div class="plaats-text"><strong id="vak-titel"></strong><span id="vak-uitleg"></span></div>
+      <button id="vak-weg" class="btn secondary small" type="button">Weg</button>
+      <button id="vak-klaar" class="btn small" type="button">Klaar</button>
+    </div>
     <div id="map"></div>
     <div class="legend" aria-label="Legenda kaart">
       <span><span class="sw" style="border:2px dashed #FFD60A"></span>Perceelgrens</span>
       <span><span class="sw" style="background:rgba(255,255,255,.6); border:2px solid #FFFFFF"></span>Gebouwen op je perceel</span>
       <span><span class="sw" style="background:rgba(107,114,128,.55)"></span>Gebouwen van de buren</span>
       <span><span class="sw" style="background:rgba(74,222,128,.45); border:2px solid #4ADE80"></span>Gekozen tuin</span>
+      <span><span class="sw" style="background:#8FBF6A; border:2px dashed #4B6B37"></span>Vakken (tik om aan te passen)</span>
     </div>
   </div>
 
@@ -185,7 +196,7 @@
 
     <section class="card" id="foto-card" aria-labelledby="t-fotos" hidden>
       <h2 id="t-fotos">Foto's van <span id="foto-zone">je tuin</span></h2>
-      <p class="note">Maak of kies een foto met de hele tuin erop, het liefst vanuit een raam op de verdieping, met de schuttingen links en rechts en de achterkant van de tuin in beeld. De app bepaalt zelf vanaf waar je fotografeerde en tekent wat hij ziet.</p>
+      <p class="note">Maak of kies een foto met de hele tuin erop, het liefst vanuit een raam op de verdieping, met de schuttingen links en rechts en de achterkant van de tuin in beeld. Daarna tik je op de kaart waar je stond en waar je naartoe keek. De app rekent dan de foto om naar de plattegrond.</p>
       <div class="row">
         <label class="btn" for="foto-input">Foto's toevoegen</label>
         <input id="foto-input" class="sr" type="file" accept="image/*" multiple>
@@ -218,7 +229,7 @@
         <div id="illus-empty" class="illus-empty">Zoek je adres om de tekening te maken.</div>
       </div>
       <div class="legend" id="illus-legend" style="margin-top:10px"></div>
-      <p class="note" style="margin-top:8px">Gestippeld = voorstel van de app. Sleep een onderdeel om het te verplaatsen, tik erop om het in de lijst te vinden.</p>
+      <p class="note" style="margin-top:8px">Gestippeld = voorstel van de app. De vorm van een vak pas je aan op de kaart bovenaan: tik op het vak en sleep de hoekpunten. Hier kun je een onderdeel ook in zijn geheel verslepen.</p>
     </section>
 
     <section class="card obj-card" aria-labelledby="t-obj">
@@ -230,7 +241,7 @@
       <div class="row">
         <label class="sr" for="add-groep">Soort onderdeel</label>
         <select id="add-groep"></select>
-        <button class="btn secondary small" id="add-obj" type="button">Zelf toevoegen</button>
+        <button class="btn secondary small" id="add-obj" type="button">Teken op de kaart</button>
       </div>
     </section>
 
@@ -253,7 +264,7 @@
   var BAG_WFS = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
   var GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/';
   // Lichtste Gemini-modellen die gratis zijn en foto's kunnen lezen (stand nov. 2026), in volgorde van voorkeur.
-  var APP_VERSION = 6;
+  var APP_VERSION = 7;
   // Voor het uitlezen van foto's: eerst Gemini Flash (beter ruimtelijk inzicht), bij de limiet terugvallen op Flash-Lite. Allemaal gratis in de free tier (stand nov. 2026).
   var MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   var KEY_STORE = 'tuinkaart.geminiKey', MODEL_STORE = 'tuinkaart.geminiModel.v6';
@@ -294,7 +305,8 @@
     '- grens.links: 3 tot 6 punten langs de voet van de linker erfgrens, van dichtbij naar ver.',
     '- grens.rechts: 3 tot 6 punten langs de voet van de rechter erfgrens, van dichtbij naar ver.',
     '- grens.achter: 2 tot 6 punten langs de voet van de achterste erfgrens, van links naar rechts.',
-    '- grens.voor: alleen als de voorste grens (bijvoorbeeld de gevel van het huis) zichtbaar is.',
+    '- grens.voor: alleen als de voorste grens echt zichtbaar is. De onderrand van de foto is GEEN grens: laat voor leeg als de foto vanuit het huis is gemaakt.',
+    '- Zet geen punten op de rand van de foto, behalve waar een schutting of haag daar echt de foto uit loopt.',
     '- hoeken: de grondpunten van de hoeken van de tuin (voor_links, voor_rechts, achter_links, achter_rechts). Een hoek mag buiten de foto liggen (kleiner dan 0 of groter dan 1000) als je de grens kunt doortrekken. Laat een hoek weg als je het niet weet.',
     '',
     '2. genomen_vanaf: huis (vanuit of vlak bij het huis de tuin in), achterkant (vanaf achterin richting het huis), zijkant of onbekend. camera_hoogte_m: geschatte hoogte van de camera boven de grond (ongeveer 1,6 als iemand in de tuin staat, ongeveer 4,5 vanuit een raam op de eerste verdieping).',
@@ -347,6 +359,7 @@
   var map = L.map('map', { maxZoom: 22 }).setView([52.15, 5.3], 8);
   map.createPane('tuin').style.zIndex = 410;
   map.createPane('gebouw').style.zIndex = 420;
+  map.createPane('vak').style.zIndex = 425;
   map.createPane('grens').style.zIndex = 430;
   map.createPane('foto').style.zIndex = 440;
   L.tileLayer(luchtfoto('Actueel_ortho25'), { maxNativeZoom: 19, maxZoom: 22, attribution: 'Luchtfoto: Beeldmateriaal Nederland · Kadaster/PDOK (CC BY 4.0)' }).addTo(map);
@@ -355,6 +368,8 @@
   var gebouwLayer = L.layerGroup().addTo(map);
   var grensLayer = L.layerGroup().addTo(map);
   var fotoLayer = L.layerGroup().addTo(map);
+  var vakLayer = L.layerGroup().addTo(map);
+  try { map.pm.setLang('nl'); } catch (e) {}
   L.control.layers(null, { 'Perceelgrens': grensLayer, 'Gebouwen': gebouwLayer, 'Tuin': tuinLayer, "Foto's": fotoLayer }, { collapsed: true }).addTo(map);
 
   var state = newState();
@@ -615,6 +630,7 @@
     return same.length > 1 ? name + ' ' + (same.indexOf(z) + 1) : name;
   }
   function selectZone(id) {
+    if (typeof finishVak === 'function') { finishVak(); stopDraw(); }
     state.selected = id;
     state.selObj = null;
     drawZones(); renderZones(); renderThumbs(); drawPhotos(); renderObjects(); renderIllustration(); showFacts(); renderLees();
@@ -822,10 +838,12 @@
     }).then(function (res) {
       ph.ai = { status: 'klaar', raw: res, items: res.onderdelen || [], dims: ph.dims || { w: 1000, h: 1000 }, model: res.model };
       if (state.photos.indexOf(ph) !== -1) {
-        try { fitPhoto(ph); } catch (e) { console.warn('kijkhoek bepalen mislukt', e); }
-        placeFromPhoto(ph);
         state.leesPhoto = ph.id;
-        drawPhotos();
+        if (isPlaced(ph)) {
+          try { fitPhoto(ph); } catch (e) { console.warn('kijkhoek bepalen mislukt', e); }
+          placeFromPhoto(ph);
+          drawPhotos();
+        } else setStatus('Foto ' + photoNr(ph) + ' is uitgelezen. Zet hem op de kaart: tik waar je stond en waar je naartoe keek.');
       }
     }).catch(function (err) {
       console.warn(err);
@@ -1258,21 +1276,30 @@
     var view = eigenPlek ? turf.bearing(turf.point(ph.stand), turf.point(ph.kijk)) : defaultBearing(zone) + (vanaf === 'achterkant' ? 180 : 0);
     var bearing = quantBearing(zone, view), F = frameOf(zone, bearing);
     var sides = sideSamples(zone, F), g = raw.grens || {}, obs = [];
+    var vanuitHuis = vanaf === 'huis' || vanaf === '';
     ZIJDEN.forEach(function (s) {
       if (!sides[s].length) return;
-      (Array.isArray(g[s]) ? g[s] : []).forEach(function (q) { var p = imgPt(q, W, H); if (p) obs.push({ side: s, p: p }); });
+      if (s === 'voor' && vanuitHuis) return; // vanuit het huis zie je de voet van je eigen gevel niet; dat is meestal de onderrand van de foto
+      (Array.isArray(g[s]) ? g[s] : []).forEach(function (q) { var p = imgPt(q, W, H); if (p && !(s === 'voor' && p[1] > 0.97 * H)) obs.push({ side: s, p: p }); });
     });
     var hk = raw.hoeken || {}, corners = [];
     [['voor_links', 'links', false, 0, 0], ['voor_rechts', 'rechts', false, 1, 0], ['achter_links', 'links', true, 0, 1], ['achter_rechts', 'rechts', true, 1, 1]].forEach(function (c) {
       var p = imgPt(hk[c[0]], W, H, true);
-      if (p) corners.push({ p: p, g: sideEnd(sides, c[1], c[2], F, c[3], c[4]) });
+      if (!p) return;
+      // Een hoek precies op de rand van de foto is meestal afgekapt, niet echt gezien.
+      var opRand = p[0] <= 0.005 * W || p[0] >= 0.995 * W || p[1] <= 0.005 * H || p[1] >= 0.995 * H;
+      if (opRand || (!c[2] && vanuitHuis && p[1] >= 0 && p[1] <= H && p[0] >= 0 && p[0] <= W && p[1] > 0.9 * H)) return;
+      corners.push({ p: p, g: sideEnd(sides, c[1], c[2], F, c[3], c[4]) });
     });
     var hAI = Number(raw.camera_hoogte_m);
     hAI = isFinite(hAI) && hAI > 0.5 ? Math.min(12, hAI) : 1.7;
     var u0 = (F.umin + F.umax) / 2, v0 = F.vmin - 0.3, yaw0 = 0;
     if (eigenPlek) { var su = toUV(F, ph.stand); u0 = su[0]; v0 = su[1]; yaw0 = (norm360(view - bearing + 180) - 180) * Math.PI / 180; }
-    var f0 = Math.log(0.7 * Lmax);
+    var vastePlek = eigenPlek && ph.placeSrc !== 'exif';
+    var f0 = Math.log(0.7 * Lmax), fSig = 0.45;
+    if (ph.f35) { f0 = Math.log(ph.f35 * Math.hypot(W, H) / 43.27); fSig = 0.06; }
     function cost(p, wantRes) {
+      if (vastePlek) { p = p.slice(); p[0] = u0; p[1] = v0; }
       if (p[2] < 0.4 || p[2] > 15 || p[4] < -0.2 || p[4] > 1.45) return wantRes ? { total: 1e9, res: [] } : 1e9;
       var cam = makeCam(p, W, H), total = 0, res = [], proj = {};
       ZIJDEN.forEach(function (s) { proj[s] = sides[s].map(function (edge) { return edge.map(function (q) { return projectCam(cam, q[0], q[1]); }); }); });
@@ -1288,9 +1315,9 @@
         var q = projectCam(cam, c.g[0], c.g[1]), d = q ? Math.hypot(q[0] - c.p[0], q[1] - c.p[1]) : 300;
         res.push(d); total += 1.5 * huber(d, 12);
       });
-      total += 40 * Math.pow((p[5] - f0) / 0.45, 2);
+      total += 40 * Math.pow((p[5] - f0) / fSig, 2);
       total += 30 * Math.pow((p[2] - hAI) / Math.max(1, 0.5 * hAI), 2);
-      if (eigenPlek) total += 80 * (Math.pow(p[0] - u0, 2) + Math.pow(p[1] - v0, 2)) + 40 * Math.pow((p[3] - yaw0) / 0.35, 2);
+      if (eigenPlek) total += (vastePlek ? 0 : 80 * (Math.pow(p[0] - u0, 2) + Math.pow(p[1] - v0, 2))) + 40 * Math.pow((p[3] - yaw0) / 0.35, 2);
       else total += 20 * Math.pow((p[1] - v0) / 3, 2) + 10 * Math.pow((p[0] - u0) / F.W, 2);
       return wantRes ? { total: total, res: res } : total;
     }
@@ -1303,7 +1330,7 @@
       var hs = [hAI];
       [1.6, 3, 5].forEach(function (h) { if (hs.every(function (x) { return Math.abs(x - h) > 0.7; })) hs.push(h); });
       var cand = [], deg = Math.PI / 180;
-      var yaws = eigenPlek ? [yaw0] : [-20, -10, 0, 10, 20].map(function (a) { return a * deg; });
+      var yaws = eigenPlek ? [-10, 0, 10].map(function (a) { return yaw0 + a * deg; }) : [-20, -10, 0, 10, 20].map(function (a) { return a * deg; });
       var us = eigenPlek ? [u0] : [u0 - 0.25 * F.W, u0, u0 + 0.25 * F.W];
       var vs = eigenPlek ? [v0] : [v0, v0 - 2];
       hs.forEach(function (h) { [10, 20, 30, 40, 50, 62].forEach(function (pt) { yaws.forEach(function (yw) { us.forEach(function (uu) { vs.forEach(function (vv) {
@@ -1311,12 +1338,19 @@
         cand.push({ x: q, f: cost(q) });
       }); }); }); }); });
       cand.sort(function (a, b) { return a.f - b.f; });
+      // Bij een vaste plek rekent de app alleen hoogte, draaiing, kanteling en zoom uit.
+      var vrij = vastePlek ? [2, 3, 4, 5] : [0, 1, 2, 3, 4, 5];
+      var full = function (q, base) { var x = base.slice(); vrij.forEach(function (k, i) { x[k] = q[i]; }); return x; };
+      var st1 = [0.8, 0.8, 0.5, 0.1, 0.08, 0.12], st2 = [0.25, 0.25, 0.15, 0.03, 0.02, 0.04];
       cand.slice(0, 4).forEach(function (c) {
-        var r = nelderMead(cost, c.x, [0.8, 0.8, 0.5, 0.1, 0.08, 0.12], 1500);
-        r = nelderMead(cost, r.x, [0.25, 0.25, 0.15, 0.03, 0.02, 0.04], 800);
+        var base = c.x, fn = function (q) { return cost(full(q, base)); };
+        var r = nelderMead(fn, vrij.map(function (k) { return base[k]; }), vrij.map(function (k) { return st1[k]; }), 1500);
+        r = nelderMead(fn, r.x, vrij.map(function (k) { return st2[k]; }), 800);
+        r = { x: full(r.x, base), f: r.f };
         if (!best || r.f < best.f) best = r;
       });
     }
+    if (vastePlek) { best.x = best.x.slice(); best.x[0] = u0; best.x[1] = v0; }
     var rr = cost(best.x, true), n = rr.res.length;
     var rms = n ? Math.sqrt(rr.res.reduce(function (sum, v) { var m = Math.min(v, 300); return sum + m * m; }, 0) / n) : null;
     ph.cam = { p: best.x, F: F, bearing: bearing, W: W, H: H, rms: rms, rmsRel: rms !== null ? rms / Lmax : null, n: n, guess: !genoeg, ms: Date.now() - t0 };
@@ -1392,7 +1426,7 @@
     var line = turf.lineString(closeRing(q));
     var simp = turf.simplify(line, { tolerance: 0.15, highQuality: true }).geometry.coordinates.slice(0, -1);
     if (simp.length < 3) return ring;
-    var zacht = groep === 'gazon' || groep === 'beplanting' || groep === 'water' ? 2 : 1;
+    var zacht = 1;
     var sm = chaikin(simp, zacht);
     return closeRing(sm.map(function (p) { return fromUV(F, p[0], p[1]); }));
   }
@@ -1439,7 +1473,7 @@
   function refitPhoto(ph) {
     if (!ph.ai || ph.ai.status !== 'klaar') return;
     try { fitPhoto(ph); } catch (e) { console.warn(e); }
-    state.objects = state.objects.filter(function (o) { return !(o.src === ph.id && o.photos.length === 1 && o.status === 'voorstel' && !o.userMoved && !o.resized); });
+    state.objects = state.objects.filter(function (o) { return !(o.src === ph.id && o.photos.length === 1 && o.status === 'voorstel' && !o.userMoved && !o.resized && !o.userEdited); });
     ph.objectsPlaced = false;
     placeFromPhoto(ph);
     state.leesPhoto = ph.id;
@@ -1491,16 +1525,18 @@
     });
     $('lees-svg').innerHTML = out;
     var note = '';
+    if (!ph.cam && !isPlaced(ph)) note = 'Zet deze foto op de kaart: tik waar je stond en waar je naartoe keek. Daarna rekent de app hem om naar de plattegrond.';
     if (ph.cam) {
-      if (ph.cam.guess) note = 'De app vond te weinig erfgrenzen in de foto en heeft de kijkhoek geschat. Zorg dat de schuttingen links en rechts en de achterkant van de tuin goed in beeld zijn, of zet de foto zelf op de kaart.';
+      if (ph.cam.guess) note = 'De app vond te weinig erfgrenzen in de foto en heeft de kijkhoek geschat. Zorg dat de schuttingen links en rechts en de achterkant van de tuin goed in beeld zijn, of versleep de stip van de foto op de kaart.';
       else if (ph.cam.rmsRel < 0.03) note = 'De gele stippellijn is jouw erfgrens van de kaart, teruggerekend in de foto. Hij valt goed over de erfgrens op de foto, dus de tekening klopt naar verwachting goed.';
       else if (ph.cam.rmsRel < 0.07) note = 'De gele stippellijn is jouw erfgrens van de kaart, teruggerekend in de foto. Hij wijkt hier en daar af, dus de tekening is bij benadering.';
-      else note = 'De gele stippellijn wijkt flink af van de erfgrens op de foto. Klopt de grens op de kaart? Pas die dan aan, of zet de foto zelf op de kaart (tik op het nummer op de kaart).';
+      else note = 'De gele stippellijn wijkt flink af van de erfgrens op de foto. Klopt de grens op de kaart? Pas die dan aan, of controleer op de kaart waar je stond en waar je naartoe keek. Je kunt de vakken daarna ook zelf op de kaart bijwerken.';
     }
     $('lees-note').textContent = 'Foto ' + photoNr(ph) + (note ? ' · ' + note : '') + ' Witte stippen = erfgrens volgens de AI, gekleurde vlakken = wat hij herkent.';
   }
 
   // ================= foto's =================
+  function isPlaced(ph) { return !!((ph.userPlaced && ph.stand && ph.kijk) || ph.skipped); }
   function getPhoto(id) { return state.photos.find(function (ph) { return ph.id === id; }) || null; }
   function photoNr(ph) { return state.photos.indexOf(ph) + 1; }
   $('foto-input').addEventListener('change', function (e) {
@@ -1512,11 +1548,12 @@
     if (!window.exifr) return Promise.resolve(null);
     return Promise.all([
       exifr.gps(file).catch(function () { return null; }),
-      exifr.parse(file, ['GPSImgDirection']).catch(function () { return null; })
+      exifr.parse(file, ['GPSImgDirection', 'FocalLengthIn35mmFormat']).catch(function () { return null; })
     ]).then(function (r) {
-      var gps = r[0], dir = r[1] && r[1].GPSImgDirection;
-      if (!gps || !isFinite(gps.latitude) || !isFinite(gps.longitude)) return null;
-      return { lon: gps.longitude, lat: gps.latitude, dir: isFinite(dir) ? Number(dir) : null };
+      var gps = r[0], dir = r[1] && r[1].GPSImgDirection, f35 = Number(r[1] && r[1].FocalLengthIn35mmFormat);
+      var out = { f35: isFinite(f35) && f35 >= 10 && f35 <= 200 ? f35 : null };
+      if (gps && isFinite(gps.latitude) && isFinite(gps.longitude)) { out.lon = gps.longitude; out.lat = gps.latitude; out.dir = isFinite(dir) ? Number(dir) : null; }
+      return out;
     }).catch(function () { return null; });
   }
   function addFiles(files) {
@@ -1530,16 +1567,19 @@
       list.forEach(function (f, i) {
         var ph = { id: 'f' + (++photoSeq), url: URL.createObjectURL(f), name: f.name || 'foto', zone: zone, stand: null, kijk: null, ai: null };
         var m = metas[i];
-        if (m && centrum && turf.distance(centrum, turf.point([m.lon, m.lat]), { units: 'meters' }) < 80) {
+        if (m && m.f35) ph.f35 = m.f35;
+        if (m && isFinite(m.lon) && centrum && turf.distance(centrum, turf.point([m.lon, m.lat]), { units: 'meters' }) < 80) {
           ph.stand = [m.lon, m.lat];
-          if (m.dir !== null) { ph.kijk = dest(ph.stand, 12, m.dir); auto++; }
+          if (m.dir !== null) { ph.kijk = dest(ph.stand, 12, m.dir); ph.userPlaced = true; ph.placeSrc = 'exif'; auto++; }
         }
+        // Je zet zelf op de kaart waar je stond en welke kant je op keek.
+        if (!ph.userPlaced) state.queue.push(ph.id);
         state.photos.push(ph);
         nieuw.push(ph);
       });
       drawPhotos(); renderZones(); renderThumbs();
       nieuw.forEach(queueAnalysis);
-      if (auto) setStatus(auto === 1 ? '1 foto is automatisch geplaatst met de locatie uit de foto. Sleep de stip als hij niet klopt.' : auto + " foto's zijn automatisch geplaatst. Sleep een stip als hij niet klopt.");
+      if (auto) setStatus(auto === 1 ? '1 foto is geplaatst met de locatie uit de foto. Sleep de stip als hij niet klopt.' : auto + " foto's zijn geplaatst met de locatie uit de foto. Sleep een stip als hij niet klopt.");
       nextPlacement();
     });
   }
@@ -1557,11 +1597,13 @@
     b.hidden = false;
     $('plaats-img').src = ph.url;
     $('plaats-titel').textContent = 'Foto ' + photoNr(ph) + ': ' + (mode === 'stand' ? 'waar stond je?' : 'waar keek je naartoe?');
-    $('plaats-uitleg').textContent = mode === 'stand' ? 'Tik op de kaart waar je de foto maakte. Vanaf het huis gefotografeerd? Dan mag je overslaan.' : 'Tik op de kaart in de richting waarin je keek.';
+    $('plaats-uitleg').textContent = mode === 'stand' ? 'Tik op de kaart waar je de foto maakte, bijvoorbeeld bij het raam van je huis.' : 'Tik op de kaart op het punt waar het midden van je foto naartoe kijkt.';
     $('map').classList.add('placing');
     if (b.scrollIntoView) b.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   map.on('click', function (e) {
+    if (!state.mode && state.drawing === 'boom') { placeTree([e.latlng.lng, e.latlng.lat]); return; }
+    if (!state.mode && vakEdit) { finishVak(); return; }
     if (!state.mode) return;
     var ph = getPhoto(state.current);
     if (!ph) { nextPlacement(); return; }
@@ -1578,7 +1620,7 @@
   });
   $('plaats-skip').addEventListener('click', function () {
     var ph = getPhoto(state.queue.shift());
-    if (ph) { ph.skipped = true; if (ph.ai && ph.ai.status === 'klaar' && !ph.objectsPlaced) placeFromPhoto(ph); }
+    if (ph) { ph.skipped = true; if (ph.ai && ph.ai.status === 'klaar') refitPhoto(ph); }
     renderThumbs();
     nextPlacement();
   });
@@ -1641,7 +1683,7 @@
     box.appendChild(el('img', { src: ph.url, alt: 'Foto ' + photoNr(ph) }));
     box.appendChild(el('div', { className: 'meta' }, 'Foto ' + photoNr(ph) + ' · ' + zoneLabel(getZone(ph.zone))));
     if (ph.ai) box.appendChild(el('div', { className: 'meta' }, aiText(ph)));
-    box.appendChild(el('div', { className: 'hint' }, 'De app bepaalt zelf vanaf waar je fotografeerde. Klopt dat niet? Sleep de genummerde stip naar je echte plek en het witte bolletje in je kijkrichting.'));
+    box.appendChild(el('div', { className: 'hint' }, 'Klopt de plek niet? Sleep de genummerde stip naar waar je stond en het witte bolletje in je kijkrichting. De app rekent de foto dan opnieuw om.'));
     var row = el('div', { style: 'display:flex; flex-wrap:wrap; column-gap:16px' });
     var turn = el('button', { type: 'button', className: 'linkbtn' }, 'Kijkrichting aanwijzen');
     turn.addEventListener('click', function () { map.closePopup(); state.queue = [ph.id].concat(state.queue.filter(function (q) { return q !== ph.id; })); setMode('kijk', ph); });
@@ -1746,7 +1788,7 @@
       ed.addEventListener('click', function () { state.editObj = state.editObj === o.id ? null : o.id; renderObjects(); });
       act.appendChild(ed);
       var rm = el('button', { type: 'button', className: 'linkbtn rood', 'aria-label': o.naam + ' weghalen' }, 'Weg');
-      rm.addEventListener('click', function () { state.objects = state.objects.filter(function (x) { return x !== o; }); if (state.selObj === o.id) state.selObj = null; renderObjects(); renderIllustration(); });
+      rm.addEventListener('click', function () { if (vakEdit && vakEdit.o === o) finishVak(); state.objects = state.objects.filter(function (x) { return x !== o; }); if (state.selObj === o.id) state.selObj = null; renderObjects(); renderIllustration(); });
       act.appendChild(rm);
       row.appendChild(act);
       wrap.appendChild(row);
@@ -1765,6 +1807,11 @@
     var kl = field('Kleur', el('input', { type: 'text', value: o.kleur || '' }));
     var fm = field('Formaat', el('input', { type: 'text', value: o.formaat || '', placeholder: 'bijv. 60x60' }));
     var h = field('Hoogte (m)', el('input', { type: 'number', step: '0.1', min: '0', max: '10', value: o.hoogte ? String(o.hoogte) : '', inputmode: 'decimal' }));
+    if (o.groep !== 'erfafscheiding' && o.bagIdx === undefined) {
+      var vorm = el('button', { type: 'button', className: 'btn secondary small wide' }, 'Vorm aanpassen op de kaart');
+      vorm.addEventListener('click', function () { state.editObj = null; startVakEdit(o.id, true); });
+      f.appendChild(vorm);
+    }
     var save = el('button', { type: 'button', className: 'btn small wide' }, 'Opslaan');
     save.addEventListener('click', function () {
       o.naam = naam.value.trim() || o.naam;
@@ -1790,6 +1837,7 @@
     var zone = getZone(state.selected);
     if (!zone) { setStatus('Zoek eerst je adres.', true); return; }
     var g = $('add-groep').value;
+    if (g !== 'erfafscheiding') { startDraw(g); return; }
     var o = makeObject({ groep: g, soort: g, naam: GROEP_INFO[g].label }, null, zone, state.objects.length + 1);
     if (!o) return;
     o.status = 'bevestigd';
@@ -1874,7 +1922,8 @@
   }
 
   var ORDE = ['gazon', 'verharding', 'water', 'beplanting', 'los_object', 'overig', 'bouwwerk', 'open_bouwwerk', 'erfafscheiding', 'boom'];
-  function renderIllustration() {
+  function renderIllustration() { renderIllustrationInner(); renderVakken(); }
+  function renderIllustrationInner() {
     var svg = $('illus'), zone = getZone(state.selected);
     $('illus-zone').textContent = zone ? 'de ' + zoneLabel(zone).toLowerCase() : 'je tuin';
     if (!zone) { svg.innerHTML = ''; svg.style.display = 'none'; $('illus-empty').hidden = false; $('illus-legend').innerHTML = ''; return; }
@@ -2057,6 +2106,197 @@
     svg.addEventListener('pointercancel', function () { drag = null; renderIllustration(); });
   })();
 
+
+  // ================= vakken op de kaart aanpassen =================
+  // Elk vak (gazon, pad, terras, border...) staat ook op de kaart. Tik erop en sleep de hoekpunten, net als bij de perceelgrens.
+  var vakEdit = null;
+  function vakStyle(o, actief) {
+    var c = fillColor(o);
+    return { pane: 'vak', color: actief ? '#FFD60A' : shade(c, -0.45), weight: actief ? 3 : 2, opacity: 1, fillColor: c, fillOpacity: actief ? 0.25 : 0.4, dashArray: actief || o.status === 'bevestigd' ? null : '5 4' };
+  }
+  function outerRing(geom) {
+    var best = null, ba = -1;
+    polys(geom).forEach(function (pg) { var a = turf.area(pg); if (a > ba) { ba = a; best = pg; } });
+    return best ? best.geometry.coordinates[0] : null;
+  }
+  function renderVakken() {
+    vakLayer.clearLayers();
+    var zone = getZone(state.selected);
+    if (!zone) return;
+    state.objects.filter(function (o) { return o.zone === zone.id && o.bagIdx === undefined && !(vakEdit && vakEdit.o === o); }).forEach(function (o) {
+      var lyr = null;
+      if (o.groep === 'erfafscheiding') { if (o.geom) lyr = L.geoJSON(o.geom, { pane: 'vak', style: { color: fillColor(o), weight: 6, opacity: 0.9, lineCap: 'round' } }); }
+      else if (o.groep === 'boom') { if (o.pos) lyr = L.circle(toLL(o.pos), Object.assign({ radius: Math.max(0.5, o.w / 2) }, vakStyle(o))); }
+      else { var g = o.drawGeom || o.geom; if (g) lyr = L.geoJSON(g, { pane: 'vak', style: vakStyle(o) }); }
+      if (!lyr) return;
+      lyr.on('click', function (e) {
+        if (state.mode || state.editing || state.drawing) return; // laat de kaartklik door (foto plaatsen, tekenen)
+        L.DomEvent.stopPropagation(e);
+        startVakEdit(o.id);
+      });
+      lyr.addTo(vakLayer);
+    });
+  }
+  // Niet te veel hoekpunten om te slepen op een telefoon.
+  function fewerPoints(ring, max) {
+    var tol = [0.05, 0.1, 0.18, 0.3, 0.5], out = ring;
+    for (var i = 0; i < tol.length && out.length - 1 > max; i++) {
+      try { out = turf.simplify(turf.polygon([ring]), { tolerance: tol[i] / 111320, highQuality: true }).geometry.coordinates[0]; } catch (e) { break; }
+    }
+    // punten die heel dicht op elkaar liggen (ronde uiteinden van een pad) samenvoegen
+    var kept = [out[0]];
+    for (var j = 1; j < out.length - 1; j++) if (dist(kept[kept.length - 1], out[j]) > 0.6) kept.push(out[j]);
+    if (kept.length >= 3 && dist(kept[kept.length - 1], kept[0]) < 0.6) kept.pop();
+    if (kept.length >= 3) out = kept.concat([kept[0]]);
+    return out.length >= 4 ? out : ring;
+  }
+  function showVakBar(titel, uitleg, knoppen) {
+    $('vak-titel').textContent = titel;
+    $('vak-uitleg').textContent = uitleg;
+    $('vak-weg').hidden = !knoppen.weg;
+    $('vak-klaar').textContent = knoppen.klaar || 'Klaar';
+    $('vak-bar').hidden = false;
+  }
+  function startVakEdit(id, scroll) {
+    var o = getObj(id);
+    if (!o) return;
+    if (o.bagIdx !== undefined) { setStatus('Dit gebouw komt uit de BAG en heeft een vaste vorm.'); return; }
+    if (o.groep === 'erfafscheiding') { state.selObj = o.id; state.editObj = o.id; renderObjects(); setStatus('Een erfafscheiding volgt de erfgrens. Pas de naam of het materiaal aan in de lijst onderaan.'); return; }
+    finishVak(); stopDraw();
+    if (state.editing) stopEditing();
+    var lyr;
+    if (o.groep === 'boom') {
+      if (!o.pos) return;
+      lyr = L.circle(toLL(o.pos), Object.assign({ radius: Math.max(0.5, o.w / 2) }, vakStyle(o, true)));
+    } else {
+      var ring = o.geom ? outerRing(o.geom) : null;
+      if (!ring || ring.length < 4) return;
+      ring = fewerPoints(ring, 14);
+      lyr = L.polygon(ring.slice(0, -1).map(toLL), vakStyle(o, true));
+    }
+    vakEdit = { o: o, layer: lyr };
+    $('map').classList.add('vak-bewerken');
+    lyr.addTo(map);
+    lyr.on('click', function (e) { L.DomEvent.stopPropagation(e); });
+    lyr.pm.enable({ allowSelfIntersection: false, draggable: true, snappable: true, snapDistance: 14 });
+    lyr.on('pm:edit', commitVak);
+    state.selObj = o.id;
+    renderVakken(); renderObjects();
+    showVakBar(o.naam + ' aanpassen', o.groep === 'boom'
+      ? 'Sleep het midden om de boom te verplaatsen en het randpunt om de kruin groter of kleiner te maken.'
+      : 'Sleep de hoekpunten. Tik op een tussenpunt voor een extra hoek, houd een hoekpunt vast om hem weg te halen. Sleep het vlak om het te verplaatsen.', { weg: true });
+    var b = lyr.getBounds(), sz = map.latLngToContainerPoint(b.getNorthEast()).distanceTo(map.latLngToContainerPoint(b.getSouthWest()));
+    if (sz < 90 || !map.getBounds().contains(b)) map.fitBounds(b, { padding: [60, 60], maxZoom: 22 });
+    if (scroll && $('map').scrollIntoView) $('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function commitVak() {
+    if (!vakEdit) return;
+    var o = vakEdit.o, lyr = vakEdit.layer;
+    if (o.groep === 'boom') {
+      var c = lyr.getLatLng();
+      o.fixedPos = [c.lng, c.lat]; o.off = null; delete o.fr;
+      o.w = o.d = Math.max(0.5, Math.min(25, lyr.getRadius() * 2));
+    } else {
+      var lls = lyr.getLatLngs(), r = (Array.isArray(lls[0]) ? lls[0] : lls).map(function (ll) { return [ll.lng, ll.lat]; });
+      if (r.length < 3) return;
+      o.fixed = closeRing(r); o.off = null; o.resized = false;
+      delete o.fr; delete o.lijn; delete o.vorm;
+    }
+    o.userEdited = true; o.userMoved = true; o.plekOnbekend = false;
+    updateGeom(o);
+    renderIllustration(); renderObjects();
+  }
+  function finishVak(bevestig) {
+    if (!vakEdit) return;
+    var v = vakEdit;
+    vakEdit = null;
+    try { v.layer.pm.disable(); } catch (e) {}
+    map.removeLayer(v.layer);
+    $('map').classList.remove('vak-bewerken');
+    if (bevestig) v.o.status = 'bevestigd';
+    $('vak-bar').hidden = true;
+    renderIllustration(); renderObjects();
+  }
+  // Zelf een nieuw vak tekenen op de kaart.
+  function startDraw(g) {
+    var zone = getZone(state.selected);
+    if (!zone) { setStatus('Zoek eerst je adres.', true); return; }
+    finishVak(); stopDraw(); setMode(null);
+    if (state.editing) stopEditing();
+    state.drawing = g;
+    $('map').classList.add('vak-bewerken');
+    var stijl = vakStyle({ groep: g, kleur: '', materiaal: '', status: 'bevestigd' }, true);
+    if (g === 'boom') {
+      showVakBar('Boom toevoegen', 'Tik op de kaart waar de stam staat.', { klaar: 'Annuleren' });
+    } else {
+      map.pm.enableDraw('Polygon', { snappable: true, snapDistance: 14, allowSelfIntersection: false, pathOptions: stijl, templineStyle: { color: '#FFD60A', weight: 3 }, hintlineStyle: { color: '#FFD60A', dashArray: '5 5' } });
+      showVakBar(GROEP_INFO[g].label + ' tekenen', 'Tik de hoeken aan op de kaart. Tik op het eerste punt of op Klaar om af te sluiten.', {});
+    }
+    if ($('map').scrollIntoView) $('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function stopDraw() {
+    if (!state.drawing) return;
+    state.drawing = null;
+    try { map.pm.disableDraw(); } catch (e) {}
+    $('map').classList.remove('vak-bewerken');
+    $('vak-bar').hidden = true;
+  }
+  function newHandObject(g) {
+    var zone = getZone(state.selected);
+    var o = makeObject({ groep: g, soort: g, naam: GROEP_INFO[g].label }, null, zone, state.objects.length + 1);
+    if (!o) return null;
+    o.status = 'bevestigd'; o.plekOnbekend = false; o.userEdited = true;
+    return o;
+  }
+  map.on('pm:create', function (e) {
+    var g = state.drawing;
+    map.removeLayer(e.layer);
+    if (!g || g === 'boom') return;
+    var lls = e.layer.getLatLngs(), r = (Array.isArray(lls[0]) ? lls[0] : lls).map(function (ll) { return [ll.lng, ll.lat]; });
+    state.drawing = null;
+    $('map').classList.remove('vak-bewerken');
+    $('vak-bar').hidden = true;
+    if (r.length < 3) return;
+    var o = newHandObject(g);
+    if (!o) return;
+    o.fixed = closeRing(r); delete o.fr; delete o.lijn; delete o.vorm;
+    updateGeom(o);
+    state.objects.push(o);
+    state.selObj = o.id;
+    renderIllustration(); renderObjects();
+    setStatus(GROEP_INFO[g].label + ' toegevoegd. Tik op het vak om de vorm nog aan te passen.');
+  });
+  function placeTree(p) {
+    state.drawing = null;
+    $('map').classList.remove('vak-bewerken');
+    $('vak-bar').hidden = true;
+    var o = newHandObject('boom');
+    if (!o) return;
+    o.fixedPos = p; o.w = o.d = 4; delete o.fr;
+    updateGeom(o);
+    state.objects.push(o);
+    renderIllustration(); renderObjects();
+    startVakEdit(o.id);
+  }
+  $('vak-klaar').addEventListener('click', function () {
+    if (vakEdit) { finishVak(true); return; }
+    if (state.drawing && state.drawing !== 'boom') {
+      var d = map.pm.Draw && map.pm.Draw.Polygon;
+      if (d && d._layer && d._layer.getLatLngs().length >= 3 && d._finishShape) { d._finishShape(); return; }
+      setStatus('Tik minstens drie hoeken aan.', true);
+      return;
+    }
+    stopDraw();
+  });
+  $('vak-weg').addEventListener('click', function () {
+    if (!vakEdit) return;
+    var o = vakEdit.o;
+    finishVak();
+    state.objects = state.objects.filter(function (x) { return x !== o; });
+    if (state.selObj === o.id) state.selObj = null;
+    renderObjects(); renderIllustration();
+  });
+
   // ================= grens aanpassen =================
   function stopEditing() {
     if (state.grens && state.grens.pm && state.editing) state.grens.pm.disable();
@@ -2066,7 +2306,7 @@
   $('edit').addEventListener('click', function () {
     if (!state.grens || !state.grens.pm) return;
     if (state.editing) { stopEditing(); return; }
-    setMode(null);
+    setMode(null); finishVak(); stopDraw();
     state.grens.pm.enable({ allowSelfIntersection: false });
     state.editing = true;
     $('edit').textContent = 'Klaar met aanpassen';
@@ -2097,7 +2337,7 @@
   window.__tuinkaart = {
     getState: function () { return state; }, addFiles: addFiles, selectZone: selectZone, map: map,
     setEncoder: function (f) { encodeImage = f; }, models: MODELS,
-    dbg: { makeCam: makeCam, projectCam: projectCam, backCam: backCam, frameOf: frameOf, sideSamples: sideSamples, toUV: toUV, fromUV: fromUV, getZone: getZone, quantBearing: quantBearing, defaultBearing: defaultBearing }
+    vak: { start: function (id, sc) { startVakEdit(id, sc); }, finish: function (b) { finishVak(b); }, edit: function () { return vakEdit; }, draw: function (g) { startDraw(g); }, layer: vakLayer }, dbg: { makeCam: makeCam, projectCam: projectCam, backCam: backCam, frameOf: frameOf, sideSamples: sideSamples, toUV: toUV, fromUV: fromUV, getZone: getZone, quantBearing: quantBearing, defaultBearing: defaultBearing }
   };
 })();
 </script>

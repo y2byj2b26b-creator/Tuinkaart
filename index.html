@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tuinkaart – stap 1: je tuin in kaart</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
+<style>
+  :root { --bg:#F2F5F0; --ink:#18251C; --muted:#4F5E54; --accent:#2D6A4F; --line:#D3DBD5; --card:#FFFFFF; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+  header { max-width: 1200px; margin: 0 auto; padding: 18px 20px 6px; }
+  h1 { margin: 0; font-size: 22px; line-height: 28px; }
+  .sub { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--muted); }
+  main { max-width: 1200px; margin: 0 auto; padding: 10px 20px 28px; display: flex; flex-wrap: wrap; gap: 16px; }
+  .left { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .right { flex: 1 1 300px; display: flex; flex-direction: column; gap: 12px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .search { position: relative; }
+  .search form { display: flex; gap: 8px; }
+  .search input { flex: 1; min-width: 0; height: 48px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; font-size: 16px; }
+  .btn { height: 48px; padding: 0 18px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn.secondary { height: 44px; background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  #suggest { position: absolute; left: 0; right: 0; top: 54px; z-index: 1000; margin: 0; padding: 4px; list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(24,37,28,.10); }
+  #suggest[hidden] { display: none; }
+  #suggest button { display: block; width: 100%; min-height: 44px; padding: 10px 12px; border: none; border-radius: 8px; background: none; color: var(--ink); text-align: left; font: inherit; font-size: 15px; cursor: pointer; }
+  #suggest button:hover, #suggest button:focus { background: #EAF0EB; outline: none; }
+  .status { min-height: 20px; font-size: 14px; line-height: 20px; color: var(--muted); }
+  .status.error { color: #9B1C1C; }
+  #map { height: 62vh; min-height: 360px; border-radius: 16px; overflow: hidden; background: #C9D3C9; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+  .sw { display: inline-block; width: 14px; height: 14px; margin-right: 6px; border-radius: 3px; vertical-align: -2px; }
+  .card { padding: 16px; border-radius: 16px; background: var(--card); }
+  .card h2 { margin: 0 0 10px; font-size: 16px; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 14px; line-height: 20px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+  .note { margin: 0; font-size: 13px; line-height: 19px; color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .big { font-size: 28px; line-height: 34px; font-weight: 700; margin: 2px 0 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tuinkaart · stap 1: je tuin in kaart</h1>
+  <p class="sub">Vul je adres in. De kaart haalt je perceel, je huis en de luchtfoto op uit open data van het Kadaster.</p>
+</header>
+
+<main>
+  <div class="left">
+    <div class="search">
+      <form id="zoekform" autocomplete="off">
+        <label for="q" class="sr">Adres</label>
+        <input id="q" type="search" placeholder="Straat huisnummer, plaats  of  postcode huisnummer" aria-controls="suggest">
+        <button class="btn" type="submit">Zoek</button>
+      </form>
+      <ul id="suggest" hidden></ul>
+    </div>
+    <div id="status" class="status" role="status"></div>
+    <div id="map"></div>
+    <div class="legend" aria-label="Legenda">
+      <span><span class="sw" style="border:2px dashed #FFD60A"></span>Perceelgrens</span>
+      <span><span class="sw" style="background:rgba(255,255,255,.6); border:2px solid #FFFFFF"></span>Gebouwen op je perceel</span>
+      <span><span class="sw" style="background:rgba(107,114,128,.55)"></span>Gebouwen van de buren</span>
+      <span><span class="sw" style="background:rgba(74,222,128,.45); border:2px solid #4ADE80"></span>Tuin</span>
+    </div>
+  </div>
+
+  <aside class="right">
+    <section class="card" aria-labelledby="t-tuin">
+      <h2 id="t-tuin">Jouw tuin</h2>
+      <p class="note" id="leeg">Zoek een adres om te beginnen.</p>
+      <div id="resultaat" hidden>
+        <div class="note">Tuin, ongeveer</div>
+        <div class="big" id="v-tuin">–</div>
+        <dl>
+          <dt>Adres</dt><dd id="v-adres">–</dd>
+          <dt>Kadastraal perceel</dt><dd id="v-perceel">–</dd>
+          <dt>Perceel (Kadaster)</dt><dd id="v-perceelopp">–</dd>
+          <dt>Perceel (op de kaart)</dt><dd id="v-kaartopp">–</dd>
+          <dt>Bebouwing op perceel</dt><dd id="v-bebouwing">–</dd>
+          <dt>Bouwjaar huis</dt><dd id="v-bouwjaar">–</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="t-grens">
+      <h2 id="t-grens">Klopt de grens?</h2>
+      <p class="note">De kadastrale grens is een indicatie. Sleep de hoekpunten naar je echte erfgrens; de oppervlakte rekent mee.</p>
+      <div class="row">
+        <button class="btn secondary" id="edit" type="button" disabled>Grens aanpassen</button>
+        <button class="btn secondary" id="reset" type="button" disabled>Herstel</button>
+      </div>
+    </section>
+
+    <p class="note">Bronnen: Kadaster (kadastrale kaart en BAG) en Beeldmateriaal Nederland, via PDOK, licentie CC BY 4.0. Grenzen en oppervlaktes zijn indicatief.</p>
+  </aside>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---------- bronnen (PDOK, open data) ----------
+  var LS = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1';
+  var PERCEEL_URL = 'https://api.pdok.nl/kadaster/brk-kadastrale-kaart/ogc/v1/collections/perceel/items';
+  var BAG_WFS = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
+  function luchtfoto(layer) {
+    return 'https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+      '&LAYER=' + layer + '&STYLE=&FORMAT=image/jpeg&TILEMATRIXSET=EPSG:3857' +
+      '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- kaart ----------
+  var map = L.map('map', { maxZoom: 22 }).setView([52.15, 5.3], 8);
+  map.createPane('tuin').style.zIndex = 410;
+  map.createPane('gebouw').style.zIndex = 420;
+  map.createPane('grens').style.zIndex = 430;
+
+  L.tileLayer(luchtfoto('Actueel_ortho25'), {
+    maxNativeZoom: 19, maxZoom: 22,
+    attribution: 'Luchtfoto: Beeldmateriaal Nederland · Kadaster/PDOK (CC BY 4.0)'
+  }).addTo(map);
+  L.tileLayer(luchtfoto('Actueel_orthoHR'), { minZoom: 14, maxNativeZoom: 21, maxZoom: 22 }).addTo(map);
+
+  var tuinLayer = L.layerGroup().addTo(map);
+  var gebouwLayer = L.layerGroup().addTo(map);
+  var grensLayer = L.layerGroup().addTo(map);
+  L.control.layers(null, { 'Perceelgrens': grensLayer, 'Gebouwen': gebouwLayer, 'Tuin': tuinLayer }, { collapsed: true }).addTo(map);
+
+  var state = {};
+
+  // ---------- hulpfuncties ----------
+  function setStatus(msg, isError) {
+    var el = $('status');
+    el.textContent = msg || '';
+    el.className = 'status' + (isError ? ' error' : '');
+  }
+  function getJSON(url, signal) {
+    return fetch(url, { signal: signal }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function parsePoint(wkt) {
+    var m = /POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/.exec(wkt || '');
+    return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+  }
+  function m2(v) { return Math.round(v).toLocaleString('nl-NL') + ' m²'; }
+
+  // Sommige diensten leveren lat/lon in plaats van lon/lat: in Nederland is lon 3–8 en lat 50–54.
+  function fixAxisOrder(fc) {
+    var first = null;
+    turf.coordEach(fc, function (c) { if (!first) first = c; });
+    if (first && first[0] > 40) {
+      turf.coordEach(fc, function (c) { var t = c[0]; c[0] = c[1]; c[1] = t; });
+    }
+    return fc;
+  }
+  function largestPolygon(f) {
+    var g = f.geometry;
+    if (!g) return null;
+    if (g.type === 'Polygon') return turf.polygon(g.coordinates, f.properties || {});
+    if (g.type !== 'MultiPolygon') return null;
+    var best = null, bestArea = -1;
+    g.coordinates.forEach(function (c) {
+      var a = turf.area(turf.polygon(c));
+      if (a > bestArea) { bestArea = a; best = c; }
+    });
+    return turf.polygon(best, f.properties || {});
+  }
+  function safeIntersect(a, b) { try { return turf.intersect(a, b); } catch (e) { return null; } }
+  function safeDifference(a, b) { try { return turf.difference(a, b); } catch (e) { return a; } }
+  function toLatLngs(poly) {
+    return poly.geometry.coordinates.map(function (ring) {
+      var pts = ring.map(function (c) { return [c[1], c[0]]; });
+      var a = pts[0], z = pts[pts.length - 1];
+      if (pts.length > 1 && a[0] === z[0] && a[1] === z[1]) pts.pop();
+      return pts;
+    });
+  }
+
+  // ---------- adres zoeken ----------
+  var typTimer = null, typCtrl = null;
+  $('q').addEventListener('input', function () {
+    clearTimeout(typTimer);
+    var q = $('q').value.trim();
+    if (q.length < 3) { hideSuggest(); return; }
+    typTimer = setTimeout(function () { suggest(q); }, 250);
+  });
+  $('q').addEventListener('keydown', function (e) { if (e.key === 'Escape') hideSuggest(); });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.search')) hideSuggest(); });
+
+  function suggest(q) {
+    if (typCtrl) typCtrl.abort();
+    typCtrl = new AbortController();
+    var url = LS + '/suggest?' + new URLSearchParams({ q: q, fq: 'type:adres', rows: '6' });
+    getJSON(url, typCtrl.signal).then(function (j) {
+      showSuggest((j.response && j.response.docs) || []);
+    }).catch(function (e) { if (e.name !== 'AbortError') console.warn(e); });
+  }
+  function showSuggest(docs) {
+    var ul = $('suggest');
+    ul.innerHTML = '';
+    if (!docs.length) { ul.hidden = true; return; }
+    docs.forEach(function (d) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = d.weergavenaam;
+      b.addEventListener('click', function () {
+        $('q').value = d.weergavenaam;
+        hideSuggest();
+        lookup(d.id);
+      });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+    ul.hidden = false;
+  }
+  function hideSuggest() { $('suggest').hidden = true; }
+
+  $('zoekform').addEventListener('submit', function (e) {
+    e.preventDefault();
+    hideSuggest();
+    var q = $('q').value.trim();
+    if (!q) return;
+    setStatus('Adres zoeken…');
+    var url = LS + '/free?' + new URLSearchParams({ q: q, fq: 'type:adres', rows: '1', fl: 'id weergavenaam centroide_ll centroide_rd' });
+    getJSON(url).then(function (j) {
+      var d = j.response && j.response.docs && j.response.docs[0];
+      if (!d) { setStatus('Geen adres gevonden. Probeer straat, huisnummer en plaats.', true); return; }
+      return loadAdres(d);
+    }).catch(fail);
+  });
+
+  function lookup(id) {
+    setStatus('Adres ophalen…');
+    getJSON(LS + '/lookup?' + new URLSearchParams({ id: id })).then(function (j) {
+      var d = j.response && j.response.docs && j.response.docs[0];
+      if (!d) { setStatus('Dit adres kon niet worden opgehaald.', true); return; }
+      return loadAdres(d);
+    }).catch(fail);
+  }
+
+  function fail(err) {
+    console.error(err);
+    setStatus('Het ophalen van de gegevens lukte niet (' + (err && err.message ? err.message : 'onbekende fout') + '). Probeer het opnieuw.', true);
+  }
+
+  // ---------- perceel en gebouwen ophalen ----------
+  function fetchPercelen(ll) {
+    var dx = 0.0008, dy = 0.0005; // ca. 55 m rondom het adres
+    var url = PERCEEL_URL + '?' + new URLSearchParams({
+      f: 'json', limit: '100',
+      bbox: [ll[0] - dx, ll[1] - dy, ll[0] + dx, ll[1] + dy].join(',')
+    });
+    return getJSON(url).then(fixAxisOrder);
+  }
+  function fetchPanden(rd) {
+    var r = 70; // meter rondom het adres (RD-coördinaten)
+    var url = BAG_WFS + '?' + new URLSearchParams({
+      service: 'WFS', version: '2.0.0', request: 'GetFeature',
+      typeName: 'bag:pand', outputFormat: 'json', srsName: 'EPSG:4326', count: '300',
+      bbox: [rd[0] - r, rd[1] - r, rd[0] + r, rd[1] + r].join(',')
+    });
+    return getJSON(url).then(fixAxisOrder);
+  }
+
+  function loadAdres(d) {
+    var ll = parsePoint(d.centroide_ll);
+    var rd = parsePoint(d.centroide_rd);
+    if (!ll || !rd) { setStatus('Dit adres heeft geen coördinaten.', true); return; }
+    stopEditing();
+    state = { adres: d.weergavenaam, point: ll };
+    map.setView([ll[1], ll[0]], 20);
+    setStatus('Perceel en gebouwen ophalen…');
+
+    return Promise.all([fetchPercelen(ll), fetchPanden(rd).catch(function (e) { console.warn(e); return { features: [] }; })])
+      .then(function (res) {
+        var percelen = res[0].features || [];
+        var panden = (res[1].features || []).map(largestPolygon).filter(Boolean);
+        var pt = turf.point(ll);
+
+        var hit = percelen.filter(function (f) { return f.geometry; }).find(function (f) {
+          try { return turf.booleanPointInPolygon(pt, f); } catch (e) { return false; }
+        });
+        if (!hit && percelen.length) {
+          hit = percelen.slice().sort(function (a, b) {
+            return turf.distance(pt, turf.centroid(a)) - turf.distance(pt, turf.centroid(b));
+          })[0];
+        }
+        if (!hit) {
+          state.panden = panden;
+          state.bebouwing = [];
+          render();
+          setStatus('Op deze plek is geen kadastraal perceel gevonden.', true);
+          return;
+        }
+
+        var perceel = largestPolygon(hit);
+        state.perceelProps = hit.properties || {};
+        state.perceel = perceel;
+        state.origineel = JSON.parse(JSON.stringify(perceel));
+        state.panden = panden;
+        state.bebouwing = panden.filter(function (p) {
+          var i = safeIntersect(p, perceel);
+          return i && turf.area(i) > 2;
+        });
+        state.huis = panden.find(function (p) {
+          try { return turf.booleanPointInPolygon(pt, p); } catch (e) { return false; }
+        }) || state.bebouwing.slice().sort(function (a, b) { return turf.area(b) - turf.area(a); })[0] || null;
+
+        render();
+        map.fitBounds(state.grens.getBounds(), { padding: [30, 30], maxZoom: 21 });
+        setStatus('Klaar. Klopt de gele grens niet? Pas hem aan via “Grens aanpassen”.');
+      });
+  }
+
+  // ---------- berekenen en tekenen ----------
+  function recompute() {
+    if (!state.perceel) return;
+    var bebouwd = 0, tuin = state.perceel;
+    state.bebouwing.forEach(function (b) {
+      var i = safeIntersect(b, state.perceel);
+      if (i) bebouwd += turf.area(i);
+      if (tuin) tuin = safeDifference(tuin, b);
+    });
+    state.tuin = tuin;
+    state.bebouwdM2 = bebouwd;
+    drawTuin();
+    showFacts();
+  }
+
+  function drawTuin() {
+    tuinLayer.clearLayers();
+    if (state.tuin) {
+      L.geoJSON(state.tuin, {
+        pane: 'tuin', interactive: false,
+        style: { stroke: false, fillColor: '#4ADE80', fillOpacity: 0.35 }
+      }).addTo(tuinLayer);
+    }
+  }
+
+  function render() {
+    gebouwLayer.clearLayers();
+    grensLayer.clearLayers();
+    (state.panden || []).forEach(function (p) {
+      var eigen = state.bebouwing && state.bebouwing.indexOf(p) !== -1;
+      L.geoJSON(p, {
+        pane: 'gebouw', interactive: false,
+        style: eigen
+          ? { color: '#FFFFFF', weight: 2, fillColor: '#FFFFFF', fillOpacity: 0.5 }
+          : { color: '#9CA3AF', weight: 1, fillColor: '#6B7280', fillOpacity: 0.45 }
+      }).addTo(gebouwLayer);
+    });
+    if (state.point) {
+      L.circleMarker([state.point[1], state.point[0]], {
+        pane: 'grens', radius: 6, color: '#18251C', weight: 2, fillColor: '#FFFFFF', fillOpacity: 1
+      }).bindTooltip(state.adres || '').addTo(grensLayer);
+    }
+    if (state.perceel) {
+      state.grens = L.polygon(toLatLngs(state.perceel), {
+        pane: 'grens', color: '#FFD60A', weight: 3, dashArray: '8 6', fill: false
+      }).addTo(grensLayer);
+      state.grens.on('pm:edit', function () {
+        state.perceel = turf.polygon(state.grens.toGeoJSON().geometry.coordinates, state.perceelProps);
+        recompute();
+      });
+      $('edit').disabled = !(state.grens.pm);
+      $('reset').disabled = false;
+    } else {
+      $('edit').disabled = true;
+      $('reset').disabled = true;
+    }
+    recompute();
+    if (!state.perceel) { tuinLayer.clearLayers(); showFacts(); }
+  }
+
+  function showFacts() {
+    $('leeg').hidden = true;
+    $('resultaat').hidden = false;
+    var p = state.perceelProps || {};
+    $('v-adres').textContent = state.adres || '–';
+    $('v-perceel').textContent = state.perceel
+      ? [p.kadastrale_gemeente_waarde, p.sectie, p.perceelnummer].filter(function (x) { return x !== undefined && x !== null && x !== ''; }).join(' ') || '–'
+      : '–';
+    $('v-perceelopp').textContent = p.kadastrale_grootte_waarde ? m2(p.kadastrale_grootte_waarde) : '–';
+    $('v-kaartopp').textContent = state.perceel ? m2(turf.area(state.perceel)) : '–';
+    var n = (state.bebouwing || []).length;
+    $('v-bebouwing').textContent = state.perceel
+      ? m2(state.bebouwdM2 || 0) + ' · ' + n + (n === 1 ? ' gebouw' : ' gebouwen')
+      : '–';
+    var bj = state.huis && state.huis.properties && state.huis.properties.bouwjaar;
+    $('v-bouwjaar').textContent = bj ? String(bj) : '–';
+    $('v-tuin').textContent = state.tuin ? m2(turf.area(state.tuin)) : '–';
+  }
+
+  // ---------- grens aanpassen ----------
+  function stopEditing() {
+    if (state.grens && state.grens.pm && state.editing) state.grens.pm.disable();
+    state.editing = false;
+    $('edit').textContent = 'Grens aanpassen';
+  }
+  $('edit').addEventListener('click', function () {
+    if (!state.grens || !state.grens.pm) return;
+    if (state.editing) { stopEditing(); return; }
+    state.grens.pm.enable({ allowSelfIntersection: false });
+    state.editing = true;
+    $('edit').textContent = 'Klaar met aanpassen';
+  });
+  $('reset').addEventListener('click', function () {
+    if (!state.origineel) return;
+    stopEditing();
+    state.perceel = JSON.parse(JSON.stringify(state.origineel));
+    render();
+  });
+})();
+</script>
+</body>
+</html>

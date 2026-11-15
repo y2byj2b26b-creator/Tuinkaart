@@ -50,6 +50,17 @@
   .st-val { width: 88px; height: 48px; border-radius: 12px; border: 1px solid var(--line); text-align: center; font: inherit; font-size: 18px; font-weight: 700; color: var(--ink); background: #fff; }
   .st-small { width: 64px; }
   .st-extra { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+  .st-ro { display: inline-flex; align-items: center; justify-content: center; }
+  #ind-svg.tekenen { touch-action: none; cursor: crosshair; outline: 3px dashed #FFD60A; outline-offset: -3px; border-radius: 8px; }
+  .ind-del { cursor: pointer; }
+  .chip-big { min-height: 52px; font-size: 16px; padding: 0 18px; background: #FFF8DB; border-color: #E0B800; }
+  .pn-x { color: #C2410C; font-size: 20px; line-height: 1; font-weight: 700; }
+  .linkbtn { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; text-decoration: underline; padding: 6px 2px; min-height: 36px; }
+  #ind-found { margin: 6px 0 4px; }
+  .fchip { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 22px; background: #fff; overflow: hidden; }
+  .fchip.on { border-color: #E0B800; background: #FFF8DB; }
+  .fchip-l { border: 0; background: none; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); padding: 0 6px 0 14px; min-height: 44px; }
+  .fchip-x { border: 0; border-left: 1px solid var(--line); background: #FFF1EB; color: #C2410C; font-size: 22px; font-weight: 700; width: 44px; min-height: 44px; line-height: 1; }
   .btn { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 18px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
   .btn.secondary { height: 44px; background: #fff; color: var(--ink); border: 1px solid var(--line); }
   .btn.small { height: 40px; padding: 0 12px; font-size: 14px; }
@@ -217,15 +228,17 @@
 
     <section class="card" id="indeel-card" aria-labelledby="t-indeel" hidden>
       <h2 id="t-indeel">Je <span id="indeel-zone">tuin</span> indelen</h2>
-      <p class="note">Je tuin bestaat uit stroken vanaf het huis. Tik op een strook om hem te veranderen, of sleep de groene bolletjes. De breedte en de vorm komen uit het Kadaster.</p>
+      <p class="note">Begin met stroken vanaf het huis en teken organische vormen er met je vinger in. Tik op iets om het te veranderen, het rode kruisje haalt het weg.</p>
       <div class="ind-top">
-        <label class="btn small" for="ind-foto">Uit een foto</label>
+        <button class="btn small" id="ind-teken" type="button">Teken een vorm</button>
+        <label class="btn secondary small" for="ind-foto">Uit een foto</label>
         <input id="ind-foto" class="sr" type="file" accept="image/*">
         <button class="btn secondary small" id="ind-undo" type="button">Ongedaan maken</button>
         <button class="btn secondary small" id="ind-luchtfoto" type="button" aria-pressed="false">Luchtfoto eronder</button>
         <button class="btn secondary small" id="ind-opnieuw" type="button">Opnieuw</button>
       </div>
       <p class="note" id="ind-status" role="status"></p>
+      <div id="ind-found" hidden></div>
       <div id="ind-wrap"><svg id="ind-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Indeling van je tuin, met het huis onderaan"></svg></div>
       <div id="ind-panel"></div>
     </section>
@@ -326,7 +339,7 @@
   var BAG_WFS = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
   var GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/';
   // Lichtste Gemini-modellen die gratis zijn en foto's kunnen lezen (stand nov. 2026), in volgorde van voorkeur.
-  var APP_VERSION = 10;
+  var APP_VERSION = 11;
   // Voor het uitlezen van foto's: eerst Gemini Flash (beter ruimtelijk inzicht), bij de limiet terugvallen op Flash-Lite. Allemaal gratis in de free tier (stand nov. 2026).
   var MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   var KEY_STORE = 'tuinkaart.geminiKey', MODEL_STORE = 'tuinkaart.geminiModel.v6';
@@ -2688,7 +2701,7 @@
   }
   function indDefault(zone) {
     var bearing = quantBearing(zone, defaultBearing(zone)), F = frameOf(zone, bearing);
-    var M = { v: 1, bearing: bearing, rows: [], bands: { links: null, rechts: null }, grens: { links: 'schutting', rechts: 'schutting', achter: 'schutting' }, items: [], tegel: null, bron: 'standaard' };
+    var M = { v: 1, bearing: bearing, rows: [], bands: { links: null, rechts: null }, grens: { links: 'schutting', rechts: 'schutting', achter: 'schutting' }, items: [], shapes: [], tegel: null, bron: 'standaard' };
     if (zone.type === 'voortuin') {
       M.rows.push({ id: indId('r'), type: 'terras', d: Math.max(0.6, Math.min(1.5, Math.round(F.D * 0.3 * 10) / 10)) });
       M.rows.push({ id: indId('r'), type: 'border' });
@@ -2708,6 +2721,7 @@
       if (!M && maak !== false) M = indDefault(zone);
       if (M) state.indeling[zone.id] = M;
     }
+    if (M && !M.shapes) M.shapes = [];
     return M;
   }
   function indSave(zone, M) { try { localStorage.setItem(indStorageKey(zone), JSON.stringify(M)); } catch (e) {} }
@@ -2743,9 +2757,101 @@
   function safeDiff(a, b) { if (!a) return null; if (!b) return a; try { return turf.difference(a, b); } catch (e) { return a; } }
   function indUnion(a, b) { if (!a) return b; if (!b) return a; try { return turf.union(a, b); } catch (e) { return a; } }
   function indBandEdges(zone, F, side) { return sideEdges(zone, F, side); }
+  // ---- lijnen tussen stroken: recht, bol, hol, golf of schuin ----
+  var IND_EDGES = [['recht', 'Recht'], ['bol', 'Bol'], ['hol', 'Hol'], ['golf', 'Golf'], ['schuin', 'Schuin']];
+  function indEdgeAmp(M, F, bounds, i) {
+    var d1 = bounds[i][1] - bounds[i][0], d2 = bounds[i + 1] ? bounds[i + 1][1] - bounds[i + 1][0] : d1;
+    return Math.max(0, Math.min(1.5, 0.3 * F.W, 0.45 * Math.min(d1, d2)));
+  }
+  function indCurveV(M, F, bounds, i, u) {
+    var n = M.rows.length;
+    if (i < 0) return F.vmin - 2;
+    if (i >= n - 1) return F.vmax + 2;
+    var base = bounds[i][1], e = M.rows[i].edge || 'recht';
+    if (e === 'recht') return base;
+    var t = Math.max(0, Math.min(1, (u - F.umin) / F.W)), A = indEdgeAmp(M, F, bounds, i), dv = 0;
+    if (e === 'bol') dv = A * 4 * t * (1 - t);
+    else if (e === 'hol') dv = -A * 4 * t * (1 - t);
+    else if (e === 'golf') dv = A * 0.7 * Math.sin(2 * Math.PI * t);
+    else if (e === 'schuin') dv = A * (2 * t - 1);
+    return base + dv;
+  }
+  // gebied van strook i tussen u = ua en u = ub, als punten (u, v)
+  function indRowRegion(M, F, bounds, i, ua, ub) {
+    var N = 28, lo = [], up = [];
+    for (var k = 0; k <= N; k++) { var u = ua + (ub - ua) * k / N; lo.push([u, indCurveV(M, F, bounds, i - 1, u)]); up.push([u, indCurveV(M, F, bounds, i, u)]); }
+    return lo.concat(up.reverse());
+  }
+  function indUVPoly(F, pts) { var r = pts.map(function (p) { return fromUV(F, p[0], p[1]); }); r.push(r[0]); return turf.polygon([r]); }
+  // ---- vloeiende vormen (Catmull-Rom door de sleeppunten) ----
+  function crPoint(p0, p1, p2, p3, t) {
+    var t2 = t * t, t3 = t2 * t;
+    return [0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+      0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)];
+  }
+  function indSmooth(pts, closed, steps) {
+    var n = pts.length, out = [];
+    if (n < 3) return pts.slice();
+    var get = function (i) { return closed ? pts[(i + n) % n] : pts[Math.max(0, Math.min(n - 1, i))]; };
+    var segs = closed ? n : n - 1;
+    for (var i = 0; i < segs; i++) for (var k = 0; k < steps; k++) out.push(crPoint(get(i - 1), get(i), get(i + 1), get(i + 2), k / steps));
+    if (!closed) out.push(pts[n - 1]);
+    return out;
+  }
+  function indResample(line, closed, K) {
+    var src = closed ? line.concat([line[0]]) : line, cum = [0];
+    for (var i = 1; i < src.length; i++) cum.push(cum[i - 1] + Math.hypot(src[i][0] - src[i - 1][0], src[i][1] - src[i - 1][1]));
+    var total = cum[cum.length - 1] || 1, out = [], j = 0;
+    for (var k = 0; k < K; k++) {
+      var d = total * k / (closed ? K : Math.max(1, K - 1));
+      while (j < cum.length - 2 && cum[j + 1] < d) j++;
+      var seg = cum[j + 1] - cum[j] || 1, t = Math.max(0, Math.min(1, (d - cum[j]) / seg));
+      out.push([src[j][0] + (src[j + 1][0] - src[j][0]) * t, src[j][1] + (src[j + 1][1] - src[j][1]) * t]);
+    }
+    return out;
+  }
+  function indShapeGeo(F, sh) {
+    try {
+      if (sh.type === 'pad') {
+        var line = indSmooth(sh.pts, false, 8).map(function (p) { return fromUV(F, p[0], p[1]); });
+        return turf.buffer(turf.lineString(line), Math.max(0.15, (sh.w || 0.8) / 2), { units: 'meters', steps: 6 });
+      }
+      var g = indUVPoly(F, indSmooth(sh.pts, true, 8));
+      var kk = turf.kinks(g);
+      if (kk && kk.features.length) { var u = null; turf.unkinkPolygon(g).features.forEach(function (pp) { u = indUnion(u, pp); }); g = u || g; }
+      return g;
+    } catch (e) { return null; }
+  }
+  // Van een bibberige vingerstreep naar een vloeiende vorm met een handvol sleeppunten.
+  function indStrokeToShape(raw, type) {
+    var pts = [];
+    raw.forEach(function (p) { var l = pts[pts.length - 1]; if (!l || Math.hypot(p[0] - l[0], p[1] - l[1]) > 0.04) pts.push(p); });
+    if (pts.length < 4) return null;
+    var len = 0, i;
+    for (i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (len < 0.8) return null;
+    var closed = type !== 'pad', N = 80, res = indResample(pts, closed, N);
+    for (var pass = 0; pass < 4; pass++) {
+      var src = res;
+      res = src.map(function (p, a) {
+        if (!closed && (a === 0 || a === N - 1)) return p;
+        var sx = 0, sy = 0, c = 0;
+        for (var o = -3; o <= 3; o++) { var b = a + o; if (closed) b = (b + N) % N; else if (b < 0 || b >= N) continue; sx += src[b][0]; sy += src[b][1]; c++; }
+        return [sx / c, sy / c];
+      });
+    }
+    var per = 0;
+    for (i = 1; i < res.length; i++) per += Math.hypot(res[i][0] - res[i - 1][0], res[i][1] - res[i - 1][1]);
+    if (closed) per += Math.hypot(res[0][0] - res[N - 1][0], res[0][1] - res[N - 1][1]);
+    var K = closed ? Math.max(5, Math.min(12, Math.round(per / 1.6))) : Math.max(3, Math.min(8, Math.round(per / 1.8)));
+    var ctrl = indResample(res, closed, K).map(function (p) { return [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]; });
+    var sh = { id: indId('s'), type: type, pts: ctrl };
+    if (type === 'pad') sh.w = 0.8;
+    return sh;
+  }
   function indSpanRegion(M, F, bounds, rowIds) {
     var reg = null;
-    M.rows.forEach(function (r, i) { if (rowIds.indexOf(r.id) !== -1) reg = indUnion(reg, rectUV(F, F.umin - 3, bounds[i][0] - (i === 0 ? 2 : 0), F.umax + 3, bounds[i][1] + (i === M.rows.length - 1 ? 2 : 0))); });
+    M.rows.forEach(function (r, i) { if (rowIds.indexOf(r.id) !== -1) reg = indUnion(reg, indUVPoly(F, indRowRegion(M, F, bounds, i, F.umin - 3, F.umax + 3))); });
     return reg;
   }
   function indItemPoly(F, it) {
@@ -2755,9 +2861,19 @@
   // Precieze vlakken voor de tekening en de kaart (alleen bij loslaten, niet tijdens het slepen).
   function indPieces(zone, M) {
     var F = frameOf(zone, M.bearing), bounds = indBounds(M, F), out = [];
-    var U0 = F.umin - 3, U1 = F.umax + 3;
-    var bouw = null;
+    var U0 = F.umin - 3, U1 = F.umax + 3, bouw = null;
     M.items.forEach(function (it) { var I = IND_ITEMS[it.kind]; if (I && I.groep === 'bouwwerk') bouw = indUnion(bouw, indItemPoly(F, it)); });
+    // eigen vormen: de laatst getekende ligt bovenop
+    var boven = null, shapes = M.shapes || [];
+    for (var si = shapes.length - 1; si >= 0; si--) {
+      var sh = shapes[si], g0 = indShapeGeo(F, sh);
+      g0 = g0 ? safeIntersect(g0, zone.geom) : null;
+      g0 = safeDiff(g0, bouw);
+      if (!g0) continue;
+      var eig = safeDiff(g0, boven);
+      if (eig) out.push({ key: 'shape:' + sh.id, type: sh.type, geom: eig, naam: IND_TYPES[sh.type].label, extra: sh });
+      boven = indUnion(boven, g0);
+    }
     var bands = {};
     ['links', 'rechts'].forEach(function (side) {
       var B = M.bands[side];
@@ -2768,17 +2884,16 @@
       var span = indSpanRegion(M, F, bounds, B.rows || M.rows.map(function (r) { return r.id; }));
       var g = span ? safeIntersect(reg, span) : null;
       g = g ? safeIntersect(g, zone.geom) : null;
-      g = safeDiff(g, bouw);
+      g = safeDiff(safeDiff(g, bouw), boven);
       if (g) { bands[side] = g; out.push({ key: 'band:' + side, type: B.type, geom: g, naam: IND_TYPES[B.type].label + ' ' + side, extra: B }); }
     });
     var allBands = indUnion(bands.links || null, bands.rechts || null);
     M.rows.forEach(function (r, i) {
-      var b = bounds[i], v0 = i === 0 ? b[0] - 2 : b[0], v1 = i === M.rows.length - 1 ? b[1] + 2 : b[1];
       var parts = r.cells ? indCellBounds(r, F).map(function (cb, j) { return { key: 'cell:' + r.id + ':' + r.cells[j].id, type: r.cells[j].type, u0: j === 0 ? U0 : cb[0], u1: j === r.cells.length - 1 ? U1 : cb[1], extra: r.cells[j] }; })
         : [{ key: 'row:' + r.id, type: r.type, u0: U0, u1: U1, extra: r }];
       parts.forEach(function (p) {
-        var g = safeIntersect(rectUV(F, p.u0, v0, p.u1, v1), zone.geom);
-        g = safeDiff(g, allBands); g = safeDiff(g, bouw);
+        var g = safeIntersect(indUVPoly(F, indRowRegion(M, F, bounds, i, p.u0, p.u1)), zone.geom);
+        g = safeDiff(safeDiff(safeDiff(g, allBands), boven), bouw);
         if (g) out.push({ key: p.key, type: p.type, geom: g, naam: IND_TYPES[p.type].label, extra: p.extra });
       });
     });
@@ -2873,26 +2988,54 @@
     var t = r.cells ? r.cells.map(function (c) { return IND_TYPES[c.type].label; }).join(' / ') : IND_TYPES[r.type].label;
     return t;
   }
+  function indPip(pt, poly) {
+    var inside = false;
+    for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      var a = poly[i], b = poly[j];
+      if ((a[1] > pt[1]) !== (b[1] > pt[1]) && pt[0] < (b[0] - a[0]) * (pt[1] - a[1]) / (b[1] - a[1] || 1e-9) + a[0]) inside = !inside;
+    }
+    return inside;
+  }
+  function indSP(Lo, pts, close) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + Lo.sx(p[0]).toFixed(1) + ' ' + Lo.sy(p[1]).toFixed(1); }).join('') + (close ? 'Z' : ''); }
+  function indBox(Lo, pts) {
+    var a = [1e9, 1e9, -1e9, -1e9];
+    pts.forEach(function (p) { var x = Lo.sx(p[0]), y = Lo.sy(p[1]); a[0] = Math.min(a[0], x); a[1] = Math.min(a[1], y); a[2] = Math.max(a[2], x); a[3] = Math.max(a[3], y); });
+    return a;
+  }
+  function indHandle(x, y, drag, r, kind) {
+    var rr = r || 10;
+    return '<g data-drag="' + drag + '" class="ind-drag"><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (rr + 11) + '" fill="transparent"/>' +
+      '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + rr + '" fill="' + (kind === 'pt' ? '#FFFFFF' : '#2E6B4F') + '" stroke="' + (kind === 'pt' ? '#2E6B4F' : '#FFFFFF') + '" stroke-width="' + (kind === 'pt' ? 3 : 2) + '"/></g>';
+  }
+  function indArrows(x, y, dir) {
+    return dir === 'v' ? '<path d="M' + (x - 4) + ' ' + (y - 2).toFixed(1) + 'l4 -4 l4 4 M' + (x - 4) + ' ' + (y + 2).toFixed(1) + 'l4 4 l4 -4" stroke="#FFFFFF" stroke-width="1.6" fill="none" pointer-events="none"/>'
+      : '<path d="M' + (x - 2).toFixed(1) + ' ' + (y - 4).toFixed(1) + 'l-4 4 l4 4 M' + (x + 2).toFixed(1) + ' ' + (y - 4).toFixed(1) + 'l4 4 l-4 4" stroke="#FFFFFF" stroke-width="1.6" fill="none" pointer-events="none"/>';
+  }
   function renderIndeling() {
     var card = $('indeel-card'), zone = getZone(state.selected);
     if (!zone) { card.hidden = true; return; }
     card.hidden = false;
     var M = indModel(zone);
+    M.shapes = M.shapes || [];
     $('indeel-zone').textContent = zoneLabel(zone).toLowerCase();
-    $('ind-undo').disabled = false;
     $('ind-luchtfoto').setAttribute('aria-pressed', indLuchtAan ? 'true' : 'false');
     $('ind-luchtfoto').classList.toggle('on', indLuchtAan);
-    var Lo = indLayout(zone, M), F = Lo.F, bounds = indBounds(M, F), svg = $('ind-svg');
+    $('ind-teken').classList.toggle('on', !!indDraw);
+    $('ind-teken').textContent = indDraw ? 'Stop met tekenen' : 'Teken een vorm';
+    var Lo = indLayout(zone, M), F = Lo.F, bounds = indBounds(M, F), svg = $('ind-svg'), n = M.rows.length;
+    svg.classList.toggle('tekenen', !!indDraw);
     svg.setAttribute('width', Lo.cw); svg.setAttribute('height', Lo.H.toFixed(0));
     svg.setAttribute('viewBox', '0 0 ' + Lo.cw + ' ' + Lo.H.toFixed(0));
-    var zp = indPath(Lo, zone.geom), s = '';
-    var x0 = Lo.ml, x1 = Lo.ml + Lo.gw, yTop = IND_TOP, yBot = IND_TOP + Lo.gh;
+    var zp = indPath(Lo, zone.geom), s = '', x0 = Lo.ml, x1 = Lo.ml + Lo.gw, yTop = IND_TOP, yBot = IND_TOP + Lo.gh;
+    var U0 = F.umin - 3, U1 = F.umax + 3;
+    var rowPath = function (i, ua, ub) { return indSP(Lo, indRowRegion(M, F, bounds, i, ua, ub), true); };
+    var sel = indFind(M, indSel);
     s += '<defs><clipPath id="ind-clip"><path d="' + zp + '"/></clipPath>';
     ['links', 'rechts'].forEach(function (side) {
       var B = M.bands[side]; if (!B) return;
-      var ids = B.rows || M.rows.map(function (r) { return r.id; }), rects = '';
-      M.rows.forEach(function (r, i) { if (ids.indexOf(r.id) === -1) return; var a = Lo.sy(bounds[i][1]), b = Lo.sy(bounds[i][0]); rects += '<rect x="0" y="' + (i === M.rows.length - 1 ? 0 : a).toFixed(1) + '" width="' + Lo.cw + '" height="' + ((i === 0 ? Lo.H : b) - (i === M.rows.length - 1 ? 0 : a)).toFixed(1) + '"/>'; });
-      s += '<clipPath id="ind-span-' + side + '">' + rects + '</clipPath>';
+      var ids = B.rows || M.rows.map(function (r) { return r.id; }), d = '';
+      M.rows.forEach(function (r, i) { if (ids.indexOf(r.id) !== -1) d += rowPath(i, U0, U1); });
+      s += '<clipPath id="ind-span-' + side + '"><path d="' + d + '"/></clipPath>';
     });
     s += '</defs>';
     // huis: de gebouwen op je perceel (BAG), anders een balk onderaan
@@ -2905,29 +3048,23 @@
       s += '<rect x="' + x0.toFixed(1) + '" y="' + (yBot + 6).toFixed(1) + '" width="' + Lo.gw.toFixed(1) + '" height="22" rx="4" fill="#B9B3A8"/>';
       s += '<text x="' + ((x0 + x1) / 2).toFixed(1) + '" y="' + (yBot + 21).toFixed(1) + '" text-anchor="middle" class="ind-t ind-wit">Huis</text>';
     }
-    // breedte bovenaan
     s += '<text x="' + ((x0 + x1) / 2).toFixed(1) + '" y="16" text-anchor="middle" class="ind-t ind-sub">' + fmtM(F.W) + ' breed</text>';
     s += '<g clip-path="url(#ind-clip)">';
     s += '<rect x="0" y="0" width="' + Lo.cw + '" height="' + Lo.H.toFixed(0) + '" fill="#EFE9DA"/>';
     var lu = indLucht[zone.id], op = indLuchtAan && lu && lu.url ? 0.45 : 1;
     if (indLuchtAan && lu && lu.url) {
-      // luchtfoto eronder, gedraaid zodat het huis onderaan staat
       var G = lu.G, p00 = toUV(F, luchtGeo(G, 0, 0)), p10 = toUV(F, luchtGeo(G, G.cw, 0)), p01 = toUV(F, luchtGeo(G, 0, G.ch));
       var ax = Lo.sx(p00[0]), ay = Lo.sy(p00[1]);
-      var m = [(Lo.sx(p10[0]) - ax) / G.cw, (Lo.sy(p10[1]) - ay) / G.cw, (Lo.sx(p01[0]) - ax) / G.ch, (Lo.sy(p01[1]) - ay) / G.ch, ax, ay];
-      s += '<image href="' + lu.url + '" width="' + G.cw + '" height="' + G.ch + '" transform="matrix(' + m.map(function (x) { return x.toFixed(4); }).join(' ') + ')" preserveAspectRatio="none"/>';
+      var mm = [(Lo.sx(p10[0]) - ax) / G.cw, (Lo.sy(p10[1]) - ay) / G.cw, (Lo.sx(p01[0]) - ax) / G.ch, (Lo.sy(p01[1]) - ay) / G.ch, ax, ay];
+      s += '<image href="' + lu.url + '" width="' + G.cw + '" height="' + G.ch + '" transform="matrix(' + mm.map(function (x) { return x.toFixed(4); }).join(' ') + ')" preserveAspectRatio="none"/>';
     }
     // stroken en vakken
     M.rows.forEach(function (r, i) {
-      var b = bounds[i], ya = i === M.rows.length - 1 ? 0 : Lo.sy(b[1]), yb = i === 0 ? Lo.H : Lo.sy(b[0]);
-      if (!r.cells) {
-        var sel = indSelEq(indSel, 'row:' + r.id);
-        s += '<rect data-sel="row:' + r.id + '" x="0" y="' + ya.toFixed(1) + '" width="' + Lo.cw + '" height="' + (yb - ya).toFixed(1) + '" fill="' + indTypeColor(r.type, r) + '" fill-opacity="' + op + '"/>';
-      } else {
+      if (!r.cells) s += '<path data-sel="row:' + r.id + '" d="' + rowPath(i, U0, U1) + '" fill="' + indTypeColor(r.type, r) + '" fill-opacity="' + op + '"/>';
+      else {
         var cbs = indCellBounds(r, F);
         r.cells.forEach(function (c, j) {
-          var xa = j === 0 ? 0 : Lo.sx(cbs[j][0]), xb = j === r.cells.length - 1 ? Lo.cw : Lo.sx(cbs[j][1]);
-          s += '<rect data-sel="cell:' + r.id + ':' + c.id + '" x="' + xa.toFixed(1) + '" y="' + ya.toFixed(1) + '" width="' + (xb - xa).toFixed(1) + '" height="' + (yb - ya).toFixed(1) + '" fill="' + indTypeColor(c.type, c) + '" fill-opacity="' + op + '"/>';
+          s += '<path data-sel="cell:' + r.id + ':' + c.id + '" d="' + rowPath(i, j === 0 ? U0 : cbs[j][0], j === r.cells.length - 1 ? U1 : cbs[j][1]) + '" fill="' + indTypeColor(c.type, c) + '" fill-opacity="' + op + '"/>';
         });
       }
     });
@@ -2938,104 +3075,174 @@
       else { var ux = side === 'links' ? F.umin : F.umax; d = 'M' + Lo.sx(ux).toFixed(1) + ' 0L' + Lo.sx(ux).toFixed(1) + ' ' + Lo.H.toFixed(0); }
       s += '<g clip-path="url(#ind-span-' + side + ')"><path data-sel="band:' + side + '" d="' + d + '" fill="none" stroke="' + indTypeColor(B.type, B) + '" stroke-opacity="' + op + '" stroke-width="' + (2 * B.w * Lo.sc).toFixed(1) + '" stroke-linecap="square"/></g>';
     });
-    // scheidslijnen
-    M.rows.forEach(function (r, i) { if (i < M.rows.length - 1) { var y = Lo.sy(bounds[i][1]); s += '<line x1="0" x2="' + Lo.cw + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>'; } });
+    // lijnen tussen de stroken (recht of krom)
+    M.rows.forEach(function (r, i) {
+      if (i >= n - 1) return;
+      var pts = []; for (var k = 0; k <= 28; k++) { var u = U0 + (U1 - U0) * k / 28; pts.push([u, indCurveV(M, F, bounds, i, u)]); }
+      s += '<path d="' + indSP(Lo, pts) + '" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>';
+    });
+    // eigen vormen
+    M.shapes.forEach(function (sh) {
+      var on = sel && sel.kind === 'shape' && sel.shape === sh, col = indTypeColor(sh.type, sh);
+      var attrs = ' data-sel="shape:' + sh.id + '"' + (on ? ' data-drag="sbody:' + sh.id + '" class="ind-drag"' : '');
+      if (sh.type === 'pad') {
+        s += '<path' + attrs + ' d="' + indSP(Lo, indSmooth(sh.pts, false, 8)) + '" fill="none" stroke="' + col + '" stroke-opacity="' + op + '" stroke-width="' + Math.max(4, (sh.w || 0.8) * Lo.sc).toFixed(1) + '" stroke-linecap="round" stroke-linejoin="round"/>';
+        if (on) s += '<path d="' + indSP(Lo, indSmooth(sh.pts, false, 8)) + '" fill="none" stroke="#FFD60A" stroke-width="2" stroke-dasharray="5 4" pointer-events="none"/>';
+      } else {
+        s += '<path' + attrs + ' d="' + indSP(Lo, indSmooth(sh.pts, true, 8), true) + '" fill="' + col + '" fill-opacity="' + op + '" stroke="' + (on ? '#FFD60A' : '#FFFFFF') + '" stroke-width="' + (on ? 3 : 1.5) + '"/>';
+      }
+    });
     // schuren, pergola's en bomen
     M.items.forEach(function (it) {
       var I = IND_ITEMS[it.kind]; if (!I) return;
-      var cx = Lo.sx(it.u), cy = Lo.sy(it.v), sel = indSelEq(indSel, 'item:' + it.id);
+      var cx = Lo.sx(it.u), cy = Lo.sy(it.v), on = sel && sel.kind === 'item' && sel.item === it;
       if (it.kind === 'boom') {
-        var r = (it.kroon || 4) / 2 * Lo.sc;
-        s += '<g data-sel="item:' + it.id + '" data-drag="item:' + it.id + '" class="ind-drag"><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + Math.max(8, r).toFixed(1) + '" fill="#2F6B3A" fill-opacity="0.55" stroke="' + (sel ? '#FFD60A' : '#1F4A27') + '" stroke-width="' + (sel ? 3 : 1.5) + '"/><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3" fill="#5A3E2B"/></g>';
+        var rad = (it.kroon || 4) / 2 * Lo.sc;
+        s += '<g data-sel="item:' + it.id + '" data-drag="item:' + it.id + '" class="ind-drag"><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + Math.max(8, rad).toFixed(1) + '" fill="#2F6B3A" fill-opacity="0.55" stroke="' + (on ? '#FFD60A' : '#1F4A27') + '" stroke-width="' + (on ? 3 : 1.5) + '"/><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3" fill="#5A3E2B"/></g>';
       } else {
         var w = (it.w || 2) * Lo.sc, h = (it.d || 2) * Lo.sc, open = I.groep === 'open_bouwwerk';
-        s += '<g data-sel="item:' + it.id + '" data-drag="item:' + it.id + '" class="ind-drag"><rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + (open ? 'none' : '#7A6A5E') + '" stroke="' + (sel ? '#FFD60A' : (open ? '#6B4F3A' : '#4A3F36')) + '" stroke-width="' + (sel ? 3 : (open ? 3 : 1.5)) + '"' + (open ? ' stroke-dasharray="5 3"' : '') + '/>';
-        if (open) s += '<rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="#8B6B4A" fill-opacity="0.15"/>';
+        s += '<g data-sel="item:' + it.id + '" data-drag="item:' + it.id + '" class="ind-drag"><rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + (open ? '#8B6B4A' : '#7A6A5E') + '" fill-opacity="' + (open ? 0.18 : 1) + '" stroke="' + (on ? '#FFD60A' : (open ? '#6B4F3A' : '#4A3F36')) + '" stroke-width="' + (on ? 3 : (open ? 3 : 1.5)) + '"' + (open ? ' stroke-dasharray="5 3"' : '') + '/>';
         if (w > 30 && h > 16) s += '<text x="' + cx.toFixed(1) + '" y="' + (cy + 4).toFixed(1) + '" text-anchor="middle" class="ind-t' + (open ? '' : ' ind-wit') + '" pointer-events="none">' + I.label + '</text>';
         s += '</g>';
       }
     });
-    // geselecteerd vlak omlijnen
-    if (indSel && /^(row|cell|band):/.test(indSel)) {
-      var el2 = null, k = indSel.split(':');
-      if (k[0] === 'row') { var ri = M.rows.findIndex(function (r) { return r.id === k[1]; }); if (ri >= 0) { var b2 = bounds[ri]; s += '<rect x="' + x0.toFixed(1) + '" y="' + Lo.sy(b2[1]).toFixed(1) + '" width="' + Lo.gw.toFixed(1) + '" height="' + ((b2[1] - b2[0]) * Lo.sc).toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; } }
-      if (k[0] === 'cell') { var rr = M.rows.find(function (r) { return r.id === k[1]; }); if (rr && rr.cells) { var bi = M.rows.indexOf(rr), cb = indCellBounds(rr, F), ci = rr.cells.findIndex(function (c) { return c.id === k[2]; }); if (ci >= 0) s += '<rect x="' + Lo.sx(cb[ci][0]).toFixed(1) + '" y="' + Lo.sy(bounds[bi][1]).toFixed(1) + '" width="' + ((cb[ci][1] - cb[ci][0]) * Lo.sc).toFixed(1) + '" height="' + ((bounds[bi][1] - bounds[bi][0]) * Lo.sc).toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; } }
-      if (k[0] === 'band') { var BB = M.bands[k[1]]; if (BB) { var ux2 = k[1] === 'links' ? F.umin : F.umax - BB.w; s += '<rect x="' + Lo.sx(ux2).toFixed(1) + '" y="' + yTop + '" width="' + (BB.w * Lo.sc).toFixed(1) + '" height="' + Lo.gh.toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; } }
-    }
+    // gekozen strook, vak of rand omlijnen
+    if (sel && sel.kind === 'row') s += '<path d="' + rowPath(M.rows.indexOf(sel.row), U0, U1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>';
+    if (sel && sel.kind === 'cell') { var cbz = indCellBounds(sel.row, F)[sel.idx]; s += '<path d="' + rowPath(M.rows.indexOf(sel.row), cbz[0], cbz[1]) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; }
+    if (sel && sel.kind === 'band') { var ux2 = sel.side === 'links' ? F.umin : F.umax - sel.band.w; s += '<rect x="' + Lo.sx(ux2).toFixed(1) + '" y="' + yTop + '" width="' + (sel.band.w * Lo.sc).toFixed(1) + '" height="' + Lo.gh.toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; }
+    // live vingerstreep
+    if (indDraw && indDraw.pts && indDraw.pts.length > 1) s += '<path d="' + indSP(Lo, indDraw.pts) + '" fill="none" stroke="#FFD60A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>';
     s += '</g>';
     s += '<path d="' + zp + '" fill="none" stroke="#3B4A3F" stroke-width="2" pointer-events="none"/>';
-    // namen in de stroken
+    // namen (niet onder een eigen vorm)
+    var vormPolys = M.shapes.filter(function (sh) { return sh.type !== 'pad'; }).map(function (sh) { return indSmooth(sh.pts, true, 6); });
+    var vrij = function (u, v) { return !vormPolys.some(function (pg) { return indPip([u, v], pg); }); };
     M.rows.forEach(function (r, i) {
       var b = bounds[i], h = (b[1] - b[0]) * Lo.sc; if (h < 18) return;
-      var vm = (b[0] + b[1]) / 2, y = Lo.sy(vm) + 4, sp = indSpanAt(zone, F, vm).slice();
+      var vm = (b[0] + b[1]) / 2;
+      if (!r.cells) { var spm = indSpanAt(zone, F, vm), um = (spm[0] + spm[1]) / 2; if (!vrij(um, vm)) { var alt = [0.2, 0.8, 0.35, 0.65].map(function (f) { return b[0] + (b[1] - b[0]) * f; }).filter(function (v) { var sp2 = indSpanAt(zone, F, v); return vrij((sp2[0] + sp2[1]) / 2, v); }); if (!alt.length) return; vm = alt[0]; } }
+      var y = Lo.sy(vm) + 4, sp = indSpanAt(zone, F, vm).slice();
       ['links', 'rechts'].forEach(function (side) { var B = M.bands[side]; if (B && B.w > 0 && (B.rows || []).indexOf(r.id) !== -1) { if (side === 'links') sp[0] += B.w; else sp[1] -= B.w; } });
       if (!r.cells) { if ((sp[1] - sp[0]) * Lo.sc > 30) s += '<text x="' + Lo.sx((sp[0] + sp[1]) / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" class="ind-t" pointer-events="none">' + IND_TYPES[r.type].label + '</text>'; }
       else indCellBounds(r, F).forEach(function (cb, j) { var a0 = Math.max(cb[0], sp[0]), a1 = Math.min(cb[1], sp[1]); if ((a1 - a0) * Lo.sc > 36) s += '<text x="' + Lo.sx((a0 + a1) / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" class="ind-t" pointer-events="none">' + IND_TYPES[r.cells[j].type].label + '</text>'; });
+    });
+    M.shapes.forEach(function (sh) {
+      var bx = indBox(Lo, sh.pts); if (bx[2] - bx[0] < 40 || bx[3] - bx[1] < 16) return;
+      var cx = 0, cy = 0; sh.pts.forEach(function (p) { cx += Lo.sx(p[0]); cy += Lo.sy(p[1]); });
+      s += '<text x="' + (cx / sh.pts.length).toFixed(1) + '" y="' + (cy / sh.pts.length + 4).toFixed(1) + '" text-anchor="middle" class="ind-t" pointer-events="none">' + IND_TYPES[sh.type].label + '</text>';
     });
     // maatketting rechts, met sleepbolletjes op de scheidslijnen
     var mx = x1 + 18;
     s += '<line x1="' + mx + '" x2="' + mx + '" y1="' + yTop + '" y2="' + yBot.toFixed(1) + '" stroke="#9AA39C" stroke-width="1.5"/>';
     M.rows.forEach(function (r, i) {
-      var b = bounds[i], ya = Lo.sy(b[1]), yb = Lo.sy(b[0]), ym = (ya + yb) / 2, dd = b[1] - b[0], sel = indSelEq(indSel, 'row:' + r.id);
+      var b = bounds[i], ya = Lo.sy(b[1]), yb = Lo.sy(b[0]), ym = (ya + yb) / 2, dd = b[1] - b[0], on = sel && (sel.kind === 'row' || sel.kind === 'cell') && sel.row === r;
       s += '<line x1="' + (mx - 5) + '" x2="' + (mx + 5) + '" y1="' + ya.toFixed(1) + '" y2="' + ya.toFixed(1) + '" stroke="#9AA39C" stroke-width="1.5"/>';
       var tg = M.tegel ? ' · ' + (Math.round(dd / M.tegel * 10) / 10).toString().replace('.', ',') + ' t' : '';
-      s += '<g data-sel="row:' + r.id + '" class="ind-maat"><rect x="' + (mx + 8) + '" y="' + (ym - 13).toFixed(1) + '" width="' + (Lo.cw - mx - 10) + '" height="26" rx="8" fill="' + (sel ? '#FFF4C2' : '#FFFFFF') + '" stroke="' + (sel ? '#E0B800' : '#D5DAD3') + '"/>' +
+      s += '<g data-sel="row:' + r.id + '" class="ind-maat"><rect x="' + (mx + 8) + '" y="' + (ym - 13).toFixed(1) + '" width="' + (Lo.cw - mx - 10) + '" height="26" rx="8" fill="' + (on ? '#FFF4C2' : '#FFFFFF') + '" stroke="' + (on ? '#E0B800' : '#D5DAD3') + '"/>' +
         '<text x="' + (mx + 16) + '" y="' + (ym + 4).toFixed(1) + '" class="ind-t ind-maatt">' + fmtM(dd) + '<tspan class="ind-sub">' + tg + '</tspan></text></g>';
     });
-    M.rows.forEach(function (r, i) {
-      if (i >= M.rows.length - 1) return;
-      var y = Lo.sy(bounds[i][1]);
-      s += '<g data-drag="row:' + i + '" class="ind-drag"><circle cx="' + mx + '" cy="' + y.toFixed(1) + '" r="22" fill="transparent"/><circle cx="' + mx + '" cy="' + y.toFixed(1) + '" r="11" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
-        '<path d="M' + (mx - 4) + ' ' + (y - 2).toFixed(1) + 'l4 -4 l4 4 M' + (mx - 4) + ' ' + (y + 2).toFixed(1) + 'l4 4 l4 -4" stroke="#FFFFFF" stroke-width="1.6" fill="none"/></g>';
-    });
-    // vakgrenzen binnen een strook
-    M.rows.forEach(function (r, i) {
-      if (!r.cells) return;
-      var cbs = indCellBounds(r, F), ym = Lo.sy((bounds[i][0] + bounds[i][1]) / 2) + 16;
-      cbs.forEach(function (cb, j) {
-        if (j >= cbs.length - 1) return;
-        var x = Lo.sx(cb[1]);
-        s += '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + Lo.sy(bounds[i][1]).toFixed(1) + '" y2="' + Lo.sy(bounds[i][0]).toFixed(1) + '" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>';
-        s += '<g data-drag="cell:' + r.id + ':' + j + '" class="ind-drag"><circle cx="' + x.toFixed(1) + '" cy="' + ym.toFixed(1) + '" r="20" fill="transparent"/><circle cx="' + x.toFixed(1) + '" cy="' + ym.toFixed(1) + '" r="10" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
-          '<path d="M' + (x - 2).toFixed(1) + ' ' + (ym - 4).toFixed(1) + 'l-4 4 l4 4 M' + (x + 2).toFixed(1) + ' ' + (ym - 4).toFixed(1) + 'l4 4 l-4 4" stroke="#FFFFFF" stroke-width="1.6" fill="none"/></g>';
+    if (!indDraw) {
+      M.rows.forEach(function (r, i) {
+        if (i >= n - 1) return;
+        var y = Lo.sy(bounds[i][1]);
+        s += indHandle(mx, y, 'row:' + i, 11) + indArrows(mx, y, 'v');
       });
-    });
-    // randen: bolletje aan de binnenkant
-    ['links', 'rechts'].forEach(function (side) {
-      var B = M.bands[side]; if (!B) return;
-      var ids = B.rows || M.rows.map(function (r) { return r.id; }), vs = [];
-      M.rows.forEach(function (r, i) { if (ids.indexOf(r.id) !== -1) vs.push(bounds[i][0], bounds[i][1]); });
-      if (!vs.length) return;
-      var vm = (Math.min.apply(null, vs) + Math.max.apply(null, vs)) / 2, x = Lo.sx(side === 'links' ? F.umin + B.w : F.umax - B.w), y = Lo.sy(vm);
-      s += '<g data-drag="band:' + side + '" class="ind-drag"><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="20" fill="transparent"/><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="10" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
-        '<path d="M' + (x - 2).toFixed(1) + ' ' + (y - 4).toFixed(1) + 'l-4 4 l4 4 M' + (x + 2).toFixed(1) + ' ' + (y - 4).toFixed(1) + 'l4 4 l-4 4" stroke="#FFFFFF" stroke-width="1.6" fill="none"/></g>';
-    });
+      M.rows.forEach(function (r, i) {
+        if (!r.cells) return;
+        var cbs = indCellBounds(r, F), ym = Lo.sy((bounds[i][0] + bounds[i][1]) / 2) + 16;
+        cbs.forEach(function (cb, j) {
+          if (j >= cbs.length - 1) return;
+          var x = Lo.sx(cb[1]);
+          s += '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + Lo.sy(indCurveV(M, F, bounds, i, cb[1])).toFixed(1) + '" y2="' + Lo.sy(indCurveV(M, F, bounds, i - 1, cb[1])).toFixed(1) + '" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>';
+          s += indHandle(x, ym, 'cell:' + r.id + ':' + j, 10) + indArrows(x, ym, 'h');
+        });
+      });
+      ['links', 'rechts'].forEach(function (side) {
+        var B = M.bands[side]; if (!B) return;
+        var ids = B.rows || M.rows.map(function (r) { return r.id; }), vs = [];
+        M.rows.forEach(function (r, i) { if (ids.indexOf(r.id) !== -1) vs.push(bounds[i][0], bounds[i][1]); });
+        if (!vs.length) return;
+        var vm = (Math.min.apply(null, vs) + Math.max.apply(null, vs)) / 2, x = Lo.sx(side === 'links' ? F.umin + B.w : F.umax - B.w), y = Lo.sy(vm);
+        s += indHandle(x, y, 'band:' + side, 10) + indArrows(x, y, 'h');
+      });
+    }
+    // gekozen eigen vorm: sleeppunten, punten erbij en oprekken
+    if (sel && sel.kind === 'shape' && !indDraw) {
+      var sh = sel.shape, closed = sh.type !== 'pad', np = sh.pts.length, bxs = indBox(Lo, indSmooth(sh.pts, closed, 8));
+      s += '<rect x="' + bxs[0].toFixed(1) + '" y="' + bxs[1].toFixed(1) + '" width="' + (bxs[2] - bxs[0]).toFixed(1) + '" height="' + (bxs[3] - bxs[1]).toFixed(1) + '" fill="none" stroke="#2E6B4F" stroke-width="1" stroke-dasharray="4 4" pointer-events="none"/>';
+      for (var k = 0; k < (closed ? np : np - 1); k++) {
+        var a = sh.pts[k], b2 = sh.pts[(k + 1) % np], mid = crPoint(sh.pts[(k - 1 + np) % np], a, b2, sh.pts[(k + 2) % np], 0.5);
+        if (!closed) mid = [(a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2];
+        s += '<g data-drag="smid:' + sh.id + ':' + k + '" class="ind-drag"><circle cx="' + Lo.sx(mid[0]).toFixed(1) + '" cy="' + Lo.sy(mid[1]).toFixed(1) + '" r="16" fill="transparent"/><circle cx="' + Lo.sx(mid[0]).toFixed(1) + '" cy="' + Lo.sy(mid[1]).toFixed(1) + '" r="5" fill="#FFFFFF" fill-opacity="0.85" stroke="#2E6B4F" stroke-width="1.5"/></g>';
+      }
+      sh.pts.forEach(function (p, k) { s += indHandle(Lo.sx(p[0]), Lo.sy(p[1]), 'spt:' + sh.id + ':' + k, 9, 'pt'); });
+      var qx = Math.min(Lo.cw - 12, bxs[2] + 14), qy = Math.min(Lo.H - 12, bxs[3] + 14);
+      s += '<line x1="' + bxs[2].toFixed(1) + '" y1="' + bxs[3].toFixed(1) + '" x2="' + qx.toFixed(1) + '" y2="' + qy.toFixed(1) + '" stroke="#2E6B4F" stroke-width="1.5" pointer-events="none"/>';
+      s += '<g data-drag="sscale:' + sh.id + '" class="ind-drag"><rect x="' + (qx - 20).toFixed(1) + '" y="' + (qy - 20).toFixed(1) + '" width="40" height="40" fill="transparent"/><rect x="' + (qx - 10).toFixed(1) + '" y="' + (qy - 10).toFixed(1) + '" width="20" height="20" rx="4" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
+        '<path d="M' + (qx - 5).toFixed(1) + ' ' + (qy + 5).toFixed(1) + 'L' + (qx + 5).toFixed(1) + ' ' + (qy - 5).toFixed(1) + 'M' + (qx + 1).toFixed(1) + ' ' + (qy - 5).toFixed(1) + 'L' + (qx + 5).toFixed(1) + ' ' + (qy - 5).toFixed(1) + 'L' + (qx + 5).toFixed(1) + ' ' + (qy - 1).toFixed(1) + '" stroke="#FFFFFF" stroke-width="1.6" fill="none" pointer-events="none"/></g>';
+    }
+    // rode kruisje: weghalen met één tik
+    if (sel && !indDraw) {
+      var bb = null;
+      if (sel.kind === 'row') { var ri = M.rows.indexOf(sel.row); bb = [x0, Lo.sy(bounds[ri][1]), x1, Lo.sy(bounds[ri][0])]; }
+      else if (sel.kind === 'cell') { var ci = M.rows.indexOf(sel.row), cbx = indCellBounds(sel.row, F)[sel.idx]; bb = [Lo.sx(cbx[0]), Lo.sy(bounds[ci][1]), Lo.sx(cbx[1]), Lo.sy(bounds[ci][0])]; }
+      else if (sel.kind === 'band') { var uxb = sel.side === 'links' ? F.umin : F.umax - sel.band.w; bb = [Lo.sx(uxb), yTop, Lo.sx(uxb + sel.band.w), yBot]; }
+      else if (sel.kind === 'item') { var hw = (sel.item.kind === 'boom' ? (sel.item.kroon || 4) : sel.item.w) / 2, hd = (sel.item.kind === 'boom' ? (sel.item.kroon || 4) : sel.item.d) / 2; bb = [Lo.sx(sel.item.u - hw), Lo.sy(sel.item.v + hd), Lo.sx(sel.item.u + hw), Lo.sy(sel.item.v - hd)]; }
+      else if (sel.kind === 'shape') { bb = indBox(Lo, indSmooth(sel.shape.pts, sel.shape.type !== 'pad', 8)); }
+      if (bb && !(sel.kind === 'row' && n < 2)) {
+        var dx = Math.max(16, Math.min(Lo.cw - 16, bb[2] - 2)), dy = Math.max(16, Math.min(Lo.H - 16, bb[1] + 2));
+        if (sel.kind === 'row' || sel.kind === 'cell') { dx = Math.max(16, bb[0] + 18); dy = Math.max(16, Math.min(Lo.H - 16, bb[1] + 18)); }
+        if (sel.kind === 'shape') { dx = Math.max(16, Math.min(Lo.cw - 16, bb[2] + 4)); dy = Math.max(16, bb[1] - 4); }
+        s += '<g data-act="del" class="ind-del" role="button" aria-label="Weghalen"><circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="22" fill="transparent"/><circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="14" fill="#C2410C" stroke="#FFFFFF" stroke-width="2"/>' +
+          '<path d="M' + (dx - 5).toFixed(1) + ' ' + (dy - 5).toFixed(1) + 'L' + (dx + 5).toFixed(1) + ' ' + (dy + 5).toFixed(1) + 'M' + (dx + 5).toFixed(1) + ' ' + (dy - 5).toFixed(1) + 'L' + (dx - 5).toFixed(1) + ' ' + (dy + 5).toFixed(1) + '" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" pointer-events="none"/></g>';
+      }
+    }
     svg.innerHTML = s;
     renderIndPanel(zone, M, F, bounds);
+    renderIndFound(M);
   }
-
   // ---------- het paneel onder de tekening ----------
+  var IND_SHAPE_TYPES = ['border', 'gazon', 'pad', 'vijver', 'grind', 'terras', 'moestuin', 'vlonder'];
   function chip(label, act, on, color) {
     return '<button type="button" class="chip' + (on ? ' on' : '') + '" data-act="' + act + '">' + (color ? '<span class="chip-sw" style="background:' + color + '"></span>' : '') + label + '</button>';
   }
   function stepper(label, act, value, extra) {
-    return '<div class="stepper"><span class="st-label">' + label + '</span><button type="button" class="st-btn" data-act="' + act + ':-" aria-label="Kleiner">−</button>' +
-      '<input class="st-val" inputmode="decimal" data-inp="' + act + '" value="' + value + '" aria-label="' + label + '"><button type="button" class="st-btn" data-act="' + act + ':+" aria-label="Groter">+</button>' + (extra || '') + '</div>';
+    return '<div class="stepper"><span class="st-label">' + label + '</span><button type="button" class="st-btn" data-act="' + act + ':-" aria-label="' + label + ' kleiner">−</button>' +
+      '<input class="st-val" inputmode="decimal" data-inp="' + act + '" value="' + value + '" aria-label="' + label + '"><button type="button" class="st-btn" data-act="' + act + ':+" aria-label="' + label + ' groter">+</button>' + (extra || '') + '</div>';
   }
   function indFind(M, sel) {
-    if (!sel) return null;
+    if (!sel || !M) return null;
     var k = sel.split(':');
     if (k[0] === 'row') { var r = M.rows.find(function (x) { return x.id === k[1]; }); return r ? { kind: 'row', row: r, idx: M.rows.indexOf(r) } : null; }
     if (k[0] === 'cell') { var r2 = M.rows.find(function (x) { return x.id === k[1]; }); if (!r2 || !r2.cells) return null; var c = r2.cells.find(function (x) { return x.id === k[2]; }); return c ? { kind: 'cell', row: r2, cell: c, idx: r2.cells.indexOf(c) } : null; }
     if (k[0] === 'band') return M.bands[k[1]] ? { kind: 'band', side: k[1], band: M.bands[k[1]] } : null;
     if (k[0] === 'item') { var it = M.items.find(function (x) { return x.id === k[1]; }); return it ? { kind: 'item', item: it } : null; }
+    if (k[0] === 'shape') { var sh = (M.shapes || []).find(function (x) { return x.id === k[1]; }); return sh ? { kind: 'shape', shape: sh } : null; }
     return null;
   }
+  function indSelName(M, f) {
+    if (!f) return '';
+    if (f.kind === 'row') return IND_TYPES[f.row.type].label;
+    if (f.kind === 'cell') return IND_TYPES[f.cell.type].label;
+    if (f.kind === 'band') return IND_TYPES[f.band.type].label + ' ' + f.side;
+    if (f.kind === 'item') return IND_ITEMS[f.item.kind].label;
+    if (f.kind === 'shape') return IND_TYPES[f.shape.type].label;
+    return '';
+  }
+  var IND_X = '<span class="pn-x" aria-hidden="true">×</span>';
   function renderIndPanel(zone, M, F, bounds) {
     var p = $('ind-panel'), f = indFind(M, indSel), h = '';
+    if (indDraw) {
+      h += '<div class="pn-titel">Wat teken je?<button type="button" class="pn-sluit" data-act="drawstop" aria-label="Stoppen met tekenen">×</button></div>';
+      h += '<div class="chips">' + IND_SHAPE_TYPES.map(function (t) { return chip(IND_TYPES[t].label, 'drawtype:' + t, indDraw.type === t, indTypeColor(t)); }).join('') + '</div>';
+      h += '<p class="note" style="margin-top:12px">' + (indDraw.type === 'pad' ? 'Trek met je vinger een lijn waar het pad loopt.' : 'Trek met je vinger een rondje om het stuk ' + IND_TYPES[indDraw.type].label.toLowerCase() + '.') + ' Bibberen geeft niet: de app maakt er een vloeiende vorm van die je daarna nog kunt aanpassen.</p>';
+      p.innerHTML = h;
+      return;
+    }
     if (!f) {
       indSel = null;
-      h += '<p class="note">Tik op een strook, een rand of een schuur om hem aan te passen. Sleep de groene bolletjes om maten te veranderen.</p>';
+      h += '<div class="chips">' + '<button type="button" class="chip chip-big" data-act="draw">Teken een vorm met je vinger</button>' + '</div>';
+      h += '<p class="note" style="margin-top:10px">Tik op iets in de tekening om het te veranderen. Het rode kruisje haalt het weg, de groene bolletjes versleep je.</p>';
       h += '<div class="pn-kop">Toevoegen</div><div class="chips">' + chip('+ Strook', 'add:row') + chip('+ Rand links', 'add:band:links') + chip('+ Rand rechts', 'add:band:rechts') + chip('+ Schuur', 'add:item:schuur') + chip('+ Boom', 'add:item:boom') + chip('+ Pergola', 'add:item:pergola') + '</div>';
       h += '<div class="pn-kop">Tegelmaat (om te tellen)</div><div class="chips">' + chip('Geen', 'tegel:0', !M.tegel) + [0.3, 0.4, 0.5, 0.6].map(function (t) { return chip(Math.round(t * 100) + ' cm', 'tegel:' + t, M.tegel === t); }).join('') + '</div>';
       ['links', 'achter', 'rechts'].forEach(function (side) {
@@ -3043,7 +3250,7 @@
       });
     } else if (f.kind === 'row' || f.kind === 'cell') {
       var r = f.row, i = M.rows.indexOf(r), b = bounds[i], d = b[1] - b[0], last = i === M.rows.length - 1;
-      var cur = f.kind === 'cell' ? f.cell : r, curType = f.kind === 'cell' ? f.cell.type : r.type;
+      var curType = f.kind === 'cell' ? f.cell.type : r.type;
       h += '<div class="pn-titel">Strook ' + (i + 1) + (f.kind === 'cell' ? ', vak ' + (f.idx + 1) : '') + ' · ' + IND_TYPES[curType].label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
       h += '<div class="chips">' + IND_ROW_TYPES.map(function (t) { return chip(IND_TYPES[t].label, 'type:' + t, curType === t, indTypeColor(t)); }).join('') + '</div>';
       var tg = M.tegel ? '<span class="st-extra"><input class="st-val st-small" inputmode="numeric" data-inp="rowtiles" value="' + Math.round(d / M.tegel) + '" aria-label="Aantal tegels"> tegels</span>' : '';
@@ -3052,11 +3259,12 @@
         var cbs = indCellBounds(r, F), cw2 = cbs[f.idx][1] - cbs[f.idx][0];
         h += stepper('Breedte', 'cellw', fmtM(cw2).replace(' m', ''));
       }
+      if (!last) h += '<div class="pn-kop">Overgang naar strook ' + (i + 2) + '</div><div class="chips">' + IND_EDGES.map(function (e) { return chip(e[1], 'edge:' + e[0], (r.edge || 'recht') === e[0]); }).join('') + '</div>';
       h += '<div class="chips acts">';
       if (!r.cells) h += chip('Splits in tweeën', 'split');
       else if (r.cells.length < 3) h += chip('Nog een vak', 'split');
       if (r.cells) h += chip('Eén vak maken', 'merge');
-      h += chip('Strook erachter', 'insert') + (M.rows.length > 1 ? chip('Strook weg', 'delrow') : '') + '</div>';
+      h += chip('Strook erachter', 'insert') + (M.rows.length > 1 ? chip(IND_X + ' Strook weg', 'delrow') : '') + '</div>';
     } else if (f.kind === 'band') {
       var B = f.band;
       h += '<div class="pn-titel">Rand ' + f.side + ' · ' + IND_TYPES[B.type].label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
@@ -3064,7 +3272,7 @@
       h += stepper('Breedte', 'bandw', fmtM(B.w).replace(' m', ''));
       var ids = B.rows || M.rows.map(function (x) { return x.id; });
       h += '<div class="pn-kop">Loopt langs</div><div class="chips">' + M.rows.map(function (x, k) { return chip('Strook ' + (k + 1) + ' (' + indRowLabel(M, x) + ')', 'bspan:' + x.id, ids.indexOf(x.id) !== -1); }).join('') + '</div>';
-      h += '<div class="chips acts">' + chip('Rand weg', 'delband') + '</div>';
+      h += '<div class="chips acts">' + chip(IND_X + ' Rand weg', 'delband') + '</div>';
     } else if (f.kind === 'item') {
       var it = f.item, I = IND_ITEMS[it.kind];
       h += '<div class="pn-titel">' + I.label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
@@ -3077,11 +3285,30 @@
         h += stepper('Breedte', 'itemw', fmtM(it.w).replace(' m', '')) + stepper('Diepte', 'itemd', fmtM(it.d).replace(' m', ''));
       }
       h += '<div class="pn-kop">Plek (of sleep hem)</div><div class="chips">' + [['Links achter', 'la'], ['Rechts achter', 'ra'], ['Links voor', 'lv'], ['Rechts voor', 'rv'], ['Midden', 'mm']].map(function (q) { return chip(q[0], 'ipos:' + q[1]); }).join('') + '</div>';
-      h += '<div class="chips acts">' + chip(I.label + ' weg', 'delitem') + '</div>';
+      h += '<div class="chips acts">' + chip(IND_X + ' ' + I.label + ' weg', 'delitem') + '</div>';
+    } else if (f.kind === 'shape') {
+      var sh = f.shape, closed = sh.type !== 'pad', opp = 0;
+      try { var gg = indShapeGeo(F, sh), gz = gg ? safeIntersect(gg, zone.geom) : null; opp = gz ? turf.area(gz) : 0; } catch (e) {}
+      h += '<div class="pn-titel">Eigen vorm · ' + IND_TYPES[sh.type].label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
+      if (closed) h += '<div class="chips">' + IND_SHAPE_TYPES.filter(function (t) { return t !== 'pad'; }).map(function (t) { return chip(IND_TYPES[t].label, 'stype:' + t, sh.type === t, indTypeColor(t)); }).join('') + '</div>';
+      h += '<p class="note" style="margin-top:10px">Ongeveer ' + (Math.round(opp * 10) / 10).toString().replace('.', ',') + ' m². Sleep de witte bolletjes om de vorm te buigen, het vierkantje om hem op te rekken, of de vorm zelf om hem te verplaatsen. Tik op een klein bolletje voor een extra punt.</p>';
+      if (!closed) h += stepper('Breedte', 'spadw', fmtM(sh.w || 0.8).replace(' m', ''));
+      h += '<div class="stepper"><span class="st-label">Punten</span><button type="button" class="st-btn" data-act="spts:-" aria-label="Minder punten">−</button><span class="st-val st-ro">' + sh.pts.length + '</span><button type="button" class="st-btn" data-act="spts:+" aria-label="Meer punten">+</button></div>';
+      h += '<div class="chips acts">' + chip(IND_X + ' Vorm weg', 'delshape') + chip('Nog een vorm tekenen', 'draw') + '</div>';
     }
     p.innerHTML = h;
   }
-
+  // Wat de foto vond: met één tik weg te halen.
+  var indFound = null;
+  function renderIndFound(M) {
+    var box = $('ind-found');
+    if (indFound) indFound = indFound.filter(function (x) { return !!indFind(M, x.sel); });
+    if (!indFound || !indFound.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    box.innerHTML = '<div class="pn-kop" style="margin-top:4px">Gevonden in je foto. Klopt iets niet? Tik op het kruisje.</div><div class="chips">' +
+      indFound.map(function (x) { return '<span class="fchip' + (indSel === x.sel ? ' on' : '') + '"><button type="button" class="fchip-l" data-fsel="' + x.sel + '">' + esc(indSelName(M, indFind(M, x.sel))) + '</button><button type="button" class="fchip-x" data-fdel="' + x.sel + '" aria-label="' + esc(indSelName(M, indFind(M, x.sel))) + ' weghalen">×</button></span>'; }).join('') +
+      '<button type="button" class="chip" data-fok="1">Klopt zo</button></div>';
+  }
   // ---------- acties ----------
   function snapStep(M) { return M.tegel || 0.1; }
   function roundTo(x, st) { return Math.round(x / st) * st; }
@@ -3110,10 +3337,19 @@
   function indAct(act) {
     var zone = getZone(state.selected), M = indModel(zone);
     if (!zone || !M) return;
-    var F = frameOf(zone, M.bearing), f = indFind(M, indSel), a = act.split(':');
+    var a = act.split(':');
     if (a[0] === 'desel') { indSel = null; renderIndeling(); return; }
+    if (a[0] === 'draw') { indDraw = { type: (indDraw && indDraw.type) || indLastDraw || 'border', pts: [] }; indSel = null; indStatus(''); renderIndeling(); if ($('ind-svg').scrollIntoView) $('ind-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    if (a[0] === 'drawtype') { if (indDraw) { indDraw.type = a[1]; indLastDraw = a[1]; } renderIndeling(); return; }
+    if (a[0] === 'drawstop') { indDraw = null; renderIndeling(); return; }
+    if (a[0] === 'del') {
+      var f0 = indFind(M, indSel); if (!f0) return;
+      a = [f0.kind === 'row' ? 'delrow' : f0.kind === 'cell' ? 'delcell' : f0.kind === 'band' ? 'delband' : f0.kind === 'item' ? 'delitem' : 'delshape'];
+    }
+    var weg = /^del/.test(a[0]) ? indSelName(M, indFind(M, indSel)) : '';
     indChange(function (M2, F2) {
       var g = indFind(M2, indSel);
+      M2.shapes = M2.shapes || [];
       switch (a[0]) {
         case 'add':
           if (a[1] === 'row') { var nr = { id: indId('r'), type: 'gazon' }; var li = M2.rows.length - 1, bb = indBounds(M2, F2)[li]; M2.rows[li].d = Math.max(0.3, Math.round((bb[1] - bb[0]) / 2 * 10) / 10); M2.rows.push(nr); indSel = 'row:' + nr.id; }
@@ -3123,12 +3359,14 @@
         case 'tegel': M2.tegel = Number(a[1]) || null; break;
         case 'grens': M2.grens[a[1]] = a[2]; break;
         case 'type': if (g && g.kind === 'cell') g.cell.type = a[1]; else if (g) g.row.type = a[1]; break;
+        case 'edge': if (g && (g.kind === 'row' || g.kind === 'cell')) g.row.edge = a[1]; break;
         case 'depth': if (g && (g.kind === 'row' || g.kind === 'cell')) { var i = M2.rows.indexOf(g.row), b = indBounds(M2, F2)[i], st = snapStep(M2); setRowDepth(M2, F2, i, roundTo(b[1] - b[0], st) + (a[1] === '+' ? st : -st)); } break;
         case 'cellw': if (g && g.kind === 'cell') { var cbs = indCellBounds(g.row, F2), j = g.idx, cur = cbs[j][1] - cbs[j][0]; setCellWidth(g.row, F2, j, roundTo(cur, 0.1) + (a[1] === '+' ? 0.1 : -0.1)); } break;
         case 'split': if (g) { var row = g.row; if (!row.cells) { row.cells = [{ id: indId('c'), type: row.type, w: Math.round(F2.W / 2 * 10) / 10 }, { id: indId('c'), type: row.type === 'gazon' ? 'border' : 'gazon' }]; indSel = 'cell:' + row.id + ':' + row.cells[1].id; } else if (row.cells.length < 3) { var cb2 = indCellBounds(row, F2), lastW = cb2[cb2.length - 1][1] - cb2[cb2.length - 1][0]; row.cells[row.cells.length - 1].w = Math.max(0.3, Math.round(lastW / 2 * 10) / 10); var nc = { id: indId('c'), type: 'border' }; row.cells.push(nc); indSel = 'cell:' + row.id + ':' + nc.id; } } break;
         case 'merge': if (g) { g.row.type = g.kind === 'cell' ? g.cell.type : g.row.cells[0].type; g.row.cells = null; indSel = 'row:' + g.row.id; } break;
-        case 'insert': if (g) { var k = M2.rows.indexOf(g.row), bk = indBounds(M2, F2)[k], half = Math.max(0.3, Math.round((bk[1] - bk[0]) / 2 * 10) / 10), nr2 = { id: indId('r'), type: 'gazon', d: half }; if (k === M2.rows.length - 1) { g.row.d = half; M2.rows.push(nr2); } else { g.row.d = half; nr2.d = Math.max(0.3, (bk[1] - bk[0]) - half); M2.rows.splice(k + 1, 0, nr2); } indSel = 'row:' + nr2.id; } break;
-        case 'delrow': if (g && M2.rows.length > 1) { var k2 = M2.rows.indexOf(g.row), bd = indBounds(M2, F2)[k2], dd = bd[1] - bd[0]; M2.rows.splice(k2, 1); if (k2 > 0 && k2 - 1 < M2.rows.length - 1) M2.rows[k2 - 1].d = (M2.rows[k2 - 1].d || 1) + dd; ['links', 'rechts'].forEach(function (s2) { var B = M2.bands[s2]; if (B && B.rows) B.rows = B.rows.filter(function (id) { return id !== g.row.id; }); }); indSel = null; } break;
+        case 'delcell': if (g && g.kind === 'cell') { g.row.cells.splice(g.idx, 1); if (g.row.cells.length < 2) { g.row.type = g.row.cells[0].type; g.row.cells = null; } else delete g.row.cells[g.row.cells.length - 1].w; indSel = null; } break;
+        case 'insert': if (g) { var k = M2.rows.indexOf(g.row), bk = indBounds(M2, F2)[k], half = Math.max(0.3, Math.round((bk[1] - bk[0]) / 2 * 10) / 10), nr2 = { id: indId('r'), type: 'gazon', d: half }; if (k === M2.rows.length - 1) { g.row.d = half; delete nr2.d; M2.rows.push(nr2); } else { g.row.d = half; nr2.d = Math.max(0.3, (bk[1] - bk[0]) - half); M2.rows.splice(k + 1, 0, nr2); } indSel = 'row:' + nr2.id; } break;
+        case 'delrow': if (g && M2.rows.length > 1) { var k2 = M2.rows.indexOf(g.row), bd = indBounds(M2, F2)[k2], dd = bd[1] - bd[0]; M2.rows.splice(k2, 1); if (k2 > 0 && k2 - 1 < M2.rows.length - 1) M2.rows[k2 - 1].d = (M2.rows[k2 - 1].d || 1) + dd; if (M2.rows.length) delete M2.rows[M2.rows.length - 1].d; ['links', 'rechts'].forEach(function (s2) { var B = M2.bands[s2]; if (B && B.rows) B.rows = B.rows.filter(function (id) { return id !== g.row.id; }); }); indSel = null; } break;
         case 'btype': if (g && g.kind === 'band') g.band.type = a[1]; break;
         case 'bandw': if (g && g.kind === 'band') g.band.w = Math.max(0.2, Math.min(F2.W / 2, Math.round((g.band.w + (a[1] === '+' ? 0.1 : -0.1)) * 100) / 100)); break;
         case 'bspan': if (g && g.kind === 'band') { var ids = g.band.rows || M2.rows.map(function (r) { return r.id; }), ix = ids.indexOf(a[1]); if (ix === -1) ids.push(a[1]); else if (ids.length > 1) ids.splice(ix, 1); g.band.rows = ids; } break;
@@ -3142,8 +3380,17 @@
         case 'itemd': if (g && g.kind === 'item') g.item.d = Math.max(0.5, Math.round((g.item.d + (a[1] === '+' ? 0.1 : -0.1)) * 100) / 100); break;
         case 'ipos': if (g && g.kind === 'item') placeItem(F2, g.item, a[1]); break;
         case 'delitem': if (g && g.kind === 'item') { M2.items = M2.items.filter(function (x) { return x !== g.item; }); indSel = null; } break;
+        case 'stype': if (g && g.kind === 'shape' && a[1] !== 'pad') g.shape.type = a[1]; break;
+        case 'spadw': if (g && g.kind === 'shape') g.shape.w = Math.max(0.3, Math.min(3, Math.round(((g.shape.w || 0.8) + (a[1] === '+' ? 0.1 : -0.1)) * 100) / 100)); break;
+        case 'spts': if (g && g.kind === 'shape') {
+          var cl = g.shape.type !== 'pad', K = g.shape.pts.length + (a[1] === '+' ? 1 : -1);
+          K = Math.max(cl ? 4 : 2, Math.min(16, K));
+          g.shape.pts = indResample(indSmooth(g.shape.pts, cl, 12), cl, K).map(function (p) { return [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]; });
+        } break;
+        case 'delshape': if (g && g.kind === 'shape') { M2.shapes = M2.shapes.filter(function (x) { return x !== g.shape; }); indSel = null; } break;
       }
     });
+    if (weg) indStatusUndo(weg + ' weggehaald.');
   }
   function setCellWidth(row, F, j, wNew) {
     var cbs = indCellBounds(row, F), n = row.cells.length;
@@ -3171,6 +3418,7 @@
       else if (name === 'kroonw' && g.kind === 'item') g.item.kroon = Math.max(1, Math.min(15, x));
       else if (name === 'itemw' && g.kind === 'item') g.item.w = Math.max(0.5, x);
       else if (name === 'itemd' && g.kind === 'item') g.item.d = Math.max(0.5, x);
+      else if (name === 'spadw' && g.kind === 'shape') g.shape.w = Math.max(0.3, Math.min(3, x));
     });
   }
 
@@ -3181,26 +3429,55 @@
     return [(e.clientX - r.left) * kx, (e.clientY - r.top) * ky];
   }
   function indDragStart(e) {
-    var t = e.target.closest ? e.target.closest('[data-drag]') : null;
-    if (!t) return;
     var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
     var svg = $('ind-svg');
+    if (indDraw) {
+      var Lo0 = indLayout(zone, M), p0 = indPoint(e);
+      try { svg.setPointerCapture(e.pointerId); } catch (er) {}
+      indDraw.pts = [[Lo0.tu(p0[0]), Lo0.tv(p0[1])]];
+      indDrag = { what: 'draw', id: e.pointerId, start: p0, moved: true };
+      e.preventDefault();
+      return;
+    }
+    var t = e.target.closest ? e.target.closest('[data-drag]') : null;
+    if (!t) return;
     try { svg.setPointerCapture(e.pointerId); } catch (er) {}
     indDrag = { what: t.getAttribute('data-drag'), id: e.pointerId, start: indPoint(e), moved: false, before: JSON.stringify(M) };
-    var k = indDrag.what.split(':');
+    var k = indDrag.what.split(':'), F = frameOf(zone, M.bearing);
     if (k[0] === 'item') { indSel = 'item:' + k[1]; var it = M.items.find(function (x) { return x.id === k[1]; }); if (it) indDrag.orig = [it.u, it.v]; }
+    if (k[0] === 'spt' || k[0] === 'sbody' || k[0] === 'sscale' || k[0] === 'smid') {
+      var sh = (M.shapes || []).find(function (x) { return x.id === k[1]; });
+      if (sh) {
+        if (k[0] === 'smid') { // punt erbij op de lijn, en meteen slepen
+          var np = sh.pts.length, j = Number(k[2]), closed = sh.type !== 'pad';
+          var mid = closed ? crPoint(sh.pts[(j - 1 + np) % np], sh.pts[j], sh.pts[(j + 1) % np], sh.pts[(j + 2) % np], 0.5) : [(sh.pts[j][0] + sh.pts[j + 1][0]) / 2, (sh.pts[j][1] + sh.pts[j + 1][1]) / 2];
+          sh.pts.splice(j + 1, 0, [Math.round(mid[0] * 100) / 100, Math.round(mid[1] * 100) / 100]);
+          indDrag.what = 'spt:' + sh.id + ':' + (j + 1); indDrag.added = true; k = indDrag.what.split(':');
+        }
+        indDrag.orig = sh.pts.map(function (p) { return p.slice(); });
+        var xs = indSmooth(sh.pts, sh.type !== 'pad', 8);
+        indDrag.box = [Math.min.apply(null, xs.map(function (p) { return p[0]; })), Math.min.apply(null, xs.map(function (p) { return p[1]; })), Math.max.apply(null, xs.map(function (p) { return p[0]; })), Math.max.apply(null, xs.map(function (p) { return p[1]; }))];
+        if (indDrag.added) renderIndeling();
+      }
+    }
     e.preventDefault();
   }
   function indDragMove(e) {
     if (!indDrag || e.pointerId !== indDrag.id) return;
     var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
-    var pt = indPoint(e);
+    var pt = indPoint(e), Lo = indLayout(zone, M), F = Lo.F;
+    if (indDrag.what === 'draw') {
+      if (indDraw) { indDraw.pts.push([Lo.tu(pt[0]), Lo.tv(pt[1])]); }
+      if (!indRaf) indRaf = (window.requestAnimationFrame || setTimeout)(function () { indRaf = 0; renderIndeling(); });
+      e.preventDefault();
+      return;
+    }
     if (!indDrag.moved && Math.hypot(pt[0] - indDrag.start[0], pt[1] - indDrag.start[1]) < 4) return;
     indDrag.moved = true;
-    var Lo = indLayout(zone, M), F = Lo.F, k = indDrag.what.split(':'), st = snapStep(M);
+    var k = indDrag.what.split(':'), st = snapStep(M), du = (pt[0] - indDrag.start[0]) / Lo.sc, dv = -(pt[1] - indDrag.start[1]) / Lo.sc;
     if (k[0] === 'row') {
-      var i = Number(k[1]), b = indBounds(M, F)[i], v = Lo.tv(pt[1]);
-      setRowDepth(M, F, i, roundTo(v - b[0], st));
+      var i = Number(k[1]), b = indBounds(M, F)[i];
+      setRowDepth(M, F, i, roundTo(Lo.tv(pt[1]) - b[0], st));
     } else if (k[0] === 'cell') {
       var row = M.rows.find(function (x) { return x.id === k[1]; }), j = Number(k[2]);
       if (row && row.cells) { var cb = indCellBounds(row, F)[j]; setCellWidth(row, F, j, roundTo(Lo.tu(pt[0]) - cb[0], 0.1)); }
@@ -3210,9 +3487,20 @@
     } else if (k[0] === 'item') {
       var it = M.items.find(function (x) { return x.id === k[1]; });
       if (it && indDrag.orig) {
-        it.u = Math.round((indDrag.orig[0] + (pt[0] - indDrag.start[0]) / Lo.sc) * 10) / 10;
-        it.v = Math.round((indDrag.orig[1] - (pt[1] - indDrag.start[1]) / Lo.sc) * 10) / 10;
-        it.u = Math.max(F.umin, Math.min(F.umax, it.u)); it.v = Math.max(F.vmin, Math.min(F.vmax, it.v));
+        it.u = Math.max(F.umin, Math.min(F.umax, Math.round((indDrag.orig[0] + du) * 10) / 10));
+        it.v = Math.max(F.vmin, Math.min(F.vmax, Math.round((indDrag.orig[1] + dv) * 10) / 10));
+      }
+    } else if (k[0] === 'spt' || k[0] === 'sbody' || k[0] === 'sscale') {
+      var sh = (M.shapes || []).find(function (x) { return x.id === k[1]; });
+      if (sh && indDrag.orig) {
+        var o = indDrag.orig, r2 = function (x) { return Math.round(x * 100) / 100; };
+        if (k[0] === 'spt') { var q = Number(k[2]); sh.pts[q] = [r2(o[q][0] + du), r2(o[q][1] + dv)]; }
+        else if (k[0] === 'sbody') sh.pts = o.map(function (p) { return [r2(p[0] + du), r2(p[1] + dv)]; });
+        else { // oprekken vanuit de hoek linksboven
+          var bx = indDrag.box, au = bx[0], av = bx[3], cu = bx[2], cv = bx[1];
+          var kx = Math.max(0.15, (cu + du - au) / Math.max(0.1, cu - au)), ky = Math.max(0.15, (av - (cv + dv)) / Math.max(0.1, av - cv));
+          sh.pts = o.map(function (p) { return [r2(au + (p[0] - au) * kx), r2(av - (av - p[1]) * ky)]; });
+        }
       }
     }
     if (!indRaf) indRaf = (window.requestAnimationFrame || setTimeout)(function () { indRaf = 0; renderIndeling(); });
@@ -3222,23 +3510,36 @@
     if (!indDrag || (e && e.pointerId !== indDrag.id)) return;
     var d = indDrag; indDrag = null;
     var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
-    if (d.moved) {
+    if (d.what === 'draw') {
+      var raw = indDraw ? indDraw.pts : [], type = indDraw ? indDraw.type : 'border';
+      var sh = indStrokeToShape(raw, type);
+      indSkipClick = Date.now();
+      if (!sh) { if (indDraw) indDraw.pts = []; indStatus('Te kort getekend. Trek met je vinger een rondje of een lijn over de tuin.'); renderIndeling(); return; }
+      indDraw = null; indLastDraw = type;
+      indChange(function (M2) { M2.shapes = M2.shapes || []; M2.shapes.push(sh); indSel = 'shape:' + sh.id; });
+      indStatus(IND_TYPES[type].label + ' getekend. Sleep de bolletjes om de vorm aan te passen.');
+      return;
+    }
+    if (d.moved || d.added) {
       var h = indHist[zone.id] = indHist[zone.id] || []; h.push(d.before); if (h.length > 40) h.shift();
       indSkipClick = Date.now();
       indCommit(zone, M);
     } else if (/^item:/.test(d.what)) { indSel = d.what; renderIndeling(); indSkipClick = Date.now(); }
   }
-  var indSkipClick = 0;
+  var indSkipClick = 0, indDraw = null, indLastDraw = null;
   (function () {
     var svg = $('ind-svg');
     svg.addEventListener('pointerdown', indDragStart);
     svg.addEventListener('pointermove', indDragMove);
     svg.addEventListener('pointerup', indDragEnd);
     svg.addEventListener('pointercancel', indDragEnd);
-    // niet de pagina laten scrollen als je een bolletje of schuur sleept
-    svg.addEventListener('touchstart', function (e) { var t = e.target.closest ? e.target.closest('[data-drag]') : null; if (t) e.preventDefault(); }, { passive: false });
+    // niet de pagina laten scrollen bij tekenen of slepen
+    svg.addEventListener('touchstart', function (e) { var t = e.target.closest ? e.target.closest('[data-drag]') : null; if (indDraw || t) e.preventDefault(); }, { passive: false });
+    svg.addEventListener('touchmove', function (e) { if (indDraw || indDrag) e.preventDefault(); }, { passive: false });
     svg.addEventListener('click', function (e) {
-      if (Date.now() - indSkipClick < 350) return;
+      if (indDraw || Date.now() - indSkipClick < 350) return;
+      var x = e.target.closest ? e.target.closest('[data-act]') : null;
+      if (x) { indAct(x.getAttribute('data-act')); return; }
       var t = e.target.closest ? e.target.closest('[data-sel]') : null;
       indSel = t ? t.getAttribute('data-sel') : null;
       renderIndeling();
@@ -3253,20 +3554,30 @@
       if (i) indInput(i, e.target.value);
     });
     $('ind-panel').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-inp')) { e.preventDefault(); e.target.blur(); } });
+    $('ind-found').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button') : null; if (!b) return;
+      if (b.getAttribute('data-fok')) { indFound = null; renderIndeling(); return; }
+      var s1 = b.getAttribute('data-fsel'), s2 = b.getAttribute('data-fdel');
+      if (s1) { indSel = s1; renderIndeling(); indPanelInView(); }
+      if (s2) { indSel = s2; indAct('del'); }
+    });
+    $('ind-status').addEventListener('click', function (e) { var b = e.target.closest ? e.target.closest('[data-undo]') : null; if (b) $('ind-undo').click(); });
+    $('ind-teken').addEventListener('click', function () { indAct(indDraw ? 'drawstop' : 'draw'); });
     $('ind-undo').addEventListener('click', function () {
       var zone = getZone(state.selected); if (!zone) return;
       var h = indHist[zone.id] || [];
       if (!h.length) { indStatus('Er is niets meer om ongedaan te maken.'); return; }
       try { state.indeling[zone.id] = JSON.parse(h.pop()); } catch (er) { return; }
       if (indSel && !indFind(state.indeling[zone.id], indSel)) indSel = null;
+      indStatus('');
       indCommit(zone, state.indeling[zone.id]);
     });
     $('ind-opnieuw').addEventListener('click', function () {
       var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
       indPush(zone, M);
-      state.indeling[zone.id] = indDefault(zone); indSel = null;
+      state.indeling[zone.id] = indDefault(zone); indSel = null; indFound = null; indDraw = null;
       indCommit(zone, state.indeling[zone.id]);
-      indStatus('Opnieuw begonnen. Met "Ongedaan maken" krijg je je vorige indeling terug.');
+      indStatusUndo('Opnieuw begonnen.');
     });
     $('ind-luchtfoto').addEventListener('click', function () {
       indLuchtAan = !indLuchtAan;
@@ -3284,6 +3595,7 @@
     });
     window.addEventListener('resize', function () { if (state.selected) renderIndeling(); });
   })();
+  function indStatusUndo(t) { $('ind-status').innerHTML = esc(t) + ' <button type="button" class="linkbtn" data-undo="1">Ongedaan maken</button>'; }
   function indPanelInView() {
     var pn = $('ind-panel'); if (!pn || !pn.getBoundingClientRect) return;
     var top = pn.getBoundingClientRect().top, vh = window.innerHeight || 800;
@@ -3382,13 +3694,14 @@
       clearInterval(tik);
       var M = indFromAi(zone, res || {});
       if (!M) { indStatus('Er kwam geen bruikbare indeling uit de foto. Deel hem zelf in, of probeer een foto met meer van de tuin erop.'); return; }
-      var oud = indModel(zone); if (oud) indPush(zone, oud);
-      state.indeling[zone.id] = M; indSel = null;
+      var oud = indModel(zone); if (oud) { indPush(zone, oud); M.shapes = (oud.shapes || []).slice(); }
+      state.indeling[zone.id] = M; indSel = null; indDraw = null;
+      indFound = [];
+      M.rows.forEach(function (r) { if (r.cells) r.cells.forEach(function (c) { indFound.push({ sel: 'cell:' + r.id + ':' + c.id }); }); else indFound.push({ sel: 'row:' + r.id }); });
+      ['links', 'rechts'].forEach(function (sd) { if (M.bands[sd]) indFound.push({ sel: 'band:' + sd }); });
+      M.items.forEach(function (it) { indFound.push({ sel: 'item:' + it.id }); });
+      indStatus('Indeling gemaakt uit je foto. Pas de maten aan met de bolletjes, of teken organische vormen er zelf in.');
       indCommit(zone, M);
-      var wat = M.rows.map(function (r) { return indRowLabel(M, r).toLowerCase(); });
-      ['links', 'rechts'].forEach(function (s) { if (M.bands[s]) wat.push(IND_TYPES[M.bands[s].type].label.toLowerCase() + ' ' + s); });
-      M.items.forEach(function (it) { wat.push(IND_ITEMS[it.kind].label.toLowerCase()); });
-      indStatus('Indeling gemaakt uit je foto: ' + wat.join(', ') + '. Klopt een maat niet? Tik op de strook of sleep de bolletjes.');
     }).catch(function (err) {
       clearInterval(tik);
       indStatus(err && err.message === 'geen-sleutel' ? 'Voeg eerst je Gemini-sleutel toe.' : 'Uitlezen lukte niet: ' + friendlyError(err));
@@ -3642,7 +3955,7 @@
   window.__tuinkaart = {
     getState: function () { return state; }, addFiles: addFiles, selectZone: selectZone, map: map,
     setEncoder: function (f) { encodeImage = f; }, models: MODELS,
-    ind: { model: function () { var z = getZone(state.selected); return z ? indModel(z) : null; }, sel: function (k) { if (k !== undefined) { indSel = k; renderIndeling(); } return indSel; }, act: function (a) { indAct(a); }, input: function (n, v) { indInput(n, v); }, fromAi: function (r) { var z = getZone(state.selected); return indFromAi(z, r); }, pieces: function () { var z = getZone(state.selected); return indPieces(z, indModel(z)); } }, vak: { start: function (id, sc) { startVakEdit(id, sc); }, finish: function (b) { finishVak(b); }, edit: function () { return vakEdit; }, draw: function (g) { startDraw(g); }, layer: vakLayer }, dbg: { makeCam: makeCam, projectCam: projectCam, backCam: backCam, frameOf: frameOf, sideSamples: sideSamples, toUV: toUV, fromUV: fromUV, getZone: getZone, quantBearing: quantBearing, defaultBearing: defaultBearing }
+    ind: { model: function () { var z = getZone(state.selected); return z ? indModel(z) : null; }, sel: function (k) { if (k !== undefined) { indSel = k; renderIndeling(); } return indSel; }, act: function (a) { indAct(a); }, input: function (n, v) { indInput(n, v); }, fromAi: function (r) { var z = getZone(state.selected); return indFromAi(z, r); }, pieces: function () { var z = getZone(state.selected); return indPieces(z, indModel(z)); }, draw: function () { return indDraw; }, stroke: function (raw, t) { return indStrokeToShape(raw, t); } }, vak: { start: function (id, sc) { startVakEdit(id, sc); }, finish: function (b) { finishVak(b); }, edit: function () { return vakEdit; }, draw: function (g) { startDraw(g); }, layer: vakLayer }, dbg: { makeCam: makeCam, projectCam: projectCam, backCam: backCam, frameOf: frameOf, sideSamples: sideSamples, toUV: toUV, fromUV: fromUV, getZone: getZone, quantBearing: quantBearing, defaultBearing: defaultBearing }
   };
 })();
 </script>

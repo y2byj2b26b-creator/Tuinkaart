@@ -23,6 +23,33 @@
   input[type="search"], input[type="password"], input[type="text"], input[type="number"] { min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; font-size: 16px; }
   .search input { flex: 1; height: 48px; }
   [hidden] { display: none !important; }
+  #foto-card, #lucht-card, #lees-card, .obj-card { display: none !important; }
+  .ind-top { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+  .ind-top .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #ind-status:empty { display: none; }
+  #ind-wrap { width: 100%; margin-top: 8px; }
+  #ind-svg { display: block; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  .ind-t { font: 600 12px system-ui, -apple-system, sans-serif; fill: #18251C; }
+  .ind-sub { font-weight: 500; font-size: 11px; fill: #5B665E; }
+  .ind-wit { fill: #FFFFFF; }
+  .ind-maatt { font-size: 13px; }
+  .ind-drag { cursor: grab; touch-action: none; }
+  .ind-maat { cursor: pointer; }
+  #ind-panel { margin-top: 10px; }
+  .pn-titel { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 16px; margin: 4px 0 10px; }
+  .pn-sluit { flex: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 24px; line-height: 1; }
+  .pn-kop { font-size: 13px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips.acts { margin-top: 14px; }
+  .chip { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip-sw { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); flex: none; }
+  .stepper { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .st-label { min-width: 84px; font-weight: 600; font-size: 14px; }
+  .st-btn { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 26px; line-height: 1; }
+  .st-val { width: 88px; height: 48px; border-radius: 12px; border: 1px solid var(--line); text-align: center; font: inherit; font-size: 18px; font-weight: 700; color: var(--ink); background: #fff; }
+  .st-small { width: 64px; }
+  .st-extra { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
   .btn { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 18px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
   .btn.secondary { height: 44px; background: #fff; color: var(--ink); border: 1px solid var(--line); }
   .btn.small { height: 40px; padding: 0 12px; font-size: 14px; }
@@ -130,7 +157,7 @@
 <body>
 <header>
   <h1>Tuinkaart · je tuin in kaart</h1>
-  <p class="sub">Zoek je adres en kies je tuin. De app maakt meteen een plattegrond uit de luchtfoto; met foto's vul je hem aan. De tekening staat onderaan de pagina.</p>
+  <p class="sub">Zoek je adres en kies je tuin. Deel hem daarna in met stroken: in een paar minuten staat je tuin erop, met de goede maten.</p>
   <div id="update" class="update" hidden role="status"><span>Er is een nieuwe versie van de app.</span><button id="update-btn" class="btn small" type="button">Nu laden</button></div>
 </header>
 
@@ -161,7 +188,7 @@
       <span><span class="sw" style="background:rgba(255,255,255,.6); border:2px solid #FFFFFF"></span>Gebouwen op je perceel</span>
       <span><span class="sw" style="background:rgba(107,114,128,.55)"></span>Gebouwen van de buren</span>
       <span><span class="sw" style="background:rgba(74,222,128,.45); border:2px solid #4ADE80"></span>Gekozen tuin</span>
-      <span><span class="sw" style="background:#8FBF6A; border:2px dashed #4B6B37"></span>Vakken (tik om aan te passen)</span>
+      <span><span class="sw" style="background:#8FBF6A; border:2px solid #4B6B37"></span>Je indeling (tik om aan te passen)</span>
     </div>
   </div>
 
@@ -184,13 +211,28 @@
 
     <section class="card" id="zones-card" aria-labelledby="t-zones" hidden>
       <h2 id="t-zones">Met welke tuin wil je aan de slag?</h2>
-      <p class="note">Je perceel heeft meer dan één tuin. Kies er één; de foto's en de tekening gaan over die tuin.</p>
+      <p class="note">Je perceel heeft meer dan één tuin. Kies er één; de indeling en de tekening gaan over die tuin.</p>
       <div id="zones"></div>
     </section>
 
+    <section class="card" id="indeel-card" aria-labelledby="t-indeel" hidden>
+      <h2 id="t-indeel">Je <span id="indeel-zone">tuin</span> indelen</h2>
+      <p class="note">Je tuin bestaat uit stroken vanaf het huis. Tik op een strook om hem te veranderen, of sleep de groene bolletjes. De breedte en de vorm komen uit het Kadaster.</p>
+      <div class="ind-top">
+        <label class="btn small" for="ind-foto">Uit een foto</label>
+        <input id="ind-foto" class="sr" type="file" accept="image/*">
+        <button class="btn secondary small" id="ind-undo" type="button">Ongedaan maken</button>
+        <button class="btn secondary small" id="ind-luchtfoto" type="button" aria-pressed="false">Luchtfoto eronder</button>
+        <button class="btn secondary small" id="ind-opnieuw" type="button">Opnieuw</button>
+      </div>
+      <p class="note" id="ind-status" role="status"></p>
+      <div id="ind-wrap"><svg id="ind-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Indeling van je tuin, met het huis onderaan"></svg></div>
+      <div id="ind-panel"></div>
+    </section>
+
     <section class="card" id="key-card" aria-labelledby="t-key">
-      <h2 id="t-key">Luchtfoto en foto's laten uitlezen</h2>
-      <p class="note">De app gebruikt Google Gemini (gratis variant). Maak een sleutel aan op <a href="https://aistudio.google.com/apikey">aistudio.google.com</a> en plak hem hier. Hij wordt alleen op dit toestel bewaard.</p>
+      <h2 id="t-key">Indeling uit een foto (niet verplicht)</h2>
+      <p class="note">Met één foto vanaf je achterdeur maakt de app een eerste indeling. Daarvoor gebruikt hij Google Gemini (gratis variant). Maak een sleutel aan op <a href="https://aistudio.google.com/apikey">aistudio.google.com</a> en plak hem hier. Hij wordt alleen op dit toestel bewaard.</p>
       <div class="field">
         <label for="key">Gemini API-sleutel</label>
         <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Plak je sleutel">
@@ -249,7 +291,7 @@
         <div id="illus-empty" class="illus-empty">Zoek je adres om de tekening te maken.</div>
       </div>
       <div class="legend" id="illus-legend" style="margin-top:10px"></div>
-      <p class="note" style="margin-top:8px">Gestippeld = voorstel van de app. De vorm van een vak pas je aan op de kaart bovenaan: tik op het vak en sleep de hoekpunten. Hier kun je een onderdeel ook in zijn geheel verslepen.</p>
+      <p class="note" style="margin-top:8px">De tekening volgt je indeling. Tik op een onderdeel om het aan te passen bij "Je tuin indelen".</p>
     </section>
 
     <section class="card obj-card" aria-labelledby="t-obj">
@@ -284,7 +326,7 @@
   var BAG_WFS = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
   var GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/';
   // Lichtste Gemini-modellen die gratis zijn en foto's kunnen lezen (stand nov. 2026), in volgorde van voorkeur.
-  var APP_VERSION = 9;
+  var APP_VERSION = 10;
   // Voor het uitlezen van foto's: eerst Gemini Flash (beter ruimtelijk inzicht), bij de limiet terugvallen op Flash-Lite. Allemaal gratis in de free tier (stand nov. 2026).
   var MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
   var KEY_STORE = 'tuinkaart.geminiKey', MODEL_STORE = 'tuinkaart.geminiModel.v6';
@@ -651,10 +693,11 @@
   }
   function selectZone(id) {
     if (typeof finishVak === 'function') { finishVak(); stopDraw(); }
+    indSel = null;
     state.selected = id;
     state.selObj = null;
     drawZones(); renderZones(); renderThumbs(); drawPhotos(); renderObjects(); renderIllustration(); showFacts(); renderLees();
-    maybeLucht();
+    indShow();
   }
   function drawZones() {
     tuinLayer.clearLayers();
@@ -702,7 +745,9 @@
     state.tuin = tuin;
     state.bebouwdM2 = bebouwd;
     rebuildZones();
+    if (typeof indApplyAll === 'function') indApplyAll();
     drawZones(); renderZones(); renderThumbs(); showFacts(); renderObjects(); renderIllustration();
+    if (typeof renderIndeling === 'function') renderIndeling();
   }
   function render() {
     gebouwLayer.clearLayers();
@@ -718,7 +763,7 @@
       $('edit').disabled = !(state.grens.pm);
       $('reset').disabled = false;
       recompute();
-      maybeLucht();
+      indShow();
     } else {
       $('edit').disabled = true; $('reset').disabled = true;
       state.zones = []; tuinLayer.clearLayers(); renderZones(); showFacts(); renderIllustration();
@@ -758,7 +803,7 @@
     state.photos.forEach(function (ph) { if (ph.ai && (ph.ai.status === 'nokey' || ph.ai.status === 'fout')) queueAnalysis(ph); });
     var zl = getZone(state.selected);
     if (zl && state.lucht[zl.id] && (state.lucht[zl.id].status === 'nokey' || state.lucht[zl.id].status === 'fout')) { delete state.lucht[zl.id]; }
-    maybeLucht();
+    indStatus('Sleutel opgeslagen. Tik op "Uit een foto" om je tuin te laten indelen.');
   });
   $('key-clear').addEventListener('click', function () { memKey = ''; lsSet(KEY_STORE, ''); lsSet(MODEL_STORE, ''); showKeyStatus(); });
   showKeyStatus();
@@ -1070,6 +1115,16 @@
       return;
     }
     if (o.groep === 'boom' && o.fixedPos) { o.pos = offsetPt(o, o.fixedPos); o.geom = null; o.rect = null; return; }
+    if (o.fixedGeom) {
+      var fg = o.fixedGeom.type === 'Feature' ? o.fixedGeom : turf.feature(o.fixedGeom);
+      o.geom = safeIntersect(fg, zone.geom); o.rect = null;
+      if (o.geom) {
+        o.pos = turf.centroid(o.geom).geometry.coordinates;
+        var gb = turf.bbox(o.geom);
+        o.w = Math.max(0.3, dist([gb[0], gb[1]], [gb[2], gb[1]])); o.d = Math.max(0.3, dist([gb[0], gb[1]], [gb[0], gb[3]]));
+      }
+      return;
+    }
     if (o.fixed && !o.resized) {
       try {
         var fp = turf.polygon([o.fixed.map(function (q) { return offsetPt(o, q); })]);
@@ -2131,12 +2186,13 @@
       pt.x = e.clientX; pt.y = e.clientY;
       return pt.matrixTransform(ctm.inverse());
     }
-    svg.addEventListener('touchstart', function (e) { if (e.target.closest && e.target.closest('[data-id]')) e.preventDefault(); }, { passive: false });
+    svg.addEventListener('touchstart', function (e) { var g0 = e.target.closest && e.target.closest('[data-id]'), o0 = g0 && getObj(g0.getAttribute('data-id')); if (o0 && o0.src !== 'stroken') e.preventDefault(); }, { passive: false });
+    svg.addEventListener('click', function (e) { var g1 = e.target.closest && e.target.closest('[data-id]'), o1 = g1 && getObj(g1.getAttribute('data-id')); if (o1 && o1.src === 'stroken') indSelectObj(o1); });
     svg.addEventListener('pointerdown', function (e) {
       var g = e.target.closest && e.target.closest('[data-id]');
       if (!g) return;
       var o = getObj(g.getAttribute('data-id'));
-      if (!o) return;
+      if (!o || o.src === 'stroken') return;
       drag = { o: o, g: g, start: svgPoint(e), moved: false, id: e.pointerId };
       try { svg.setPointerCapture(e.pointerId); } catch (err) {}
     });
@@ -2592,6 +2648,769 @@
     maybeLucht();
   });
 
+
+  // ================= je tuin indelen met stroken =================
+  // Bijna elke tuin is vanaf het huis in stroken opgebouwd. Je stelt de stroken bij met grote knoppen en schuifjes;
+  // de erfgrens en het huis komen uit het Kadaster, dus de maten kloppen.
+  var IND_TYPES = {
+    terras: { label: 'Terras', groep: 'verharding', soort: 'terras', materiaal: 'tegels' },
+    gazon: { label: 'Gazon', groep: 'gazon', soort: 'gazon' },
+    border: { label: 'Border', groep: 'beplanting', soort: 'border' },
+    grind: { label: 'Grind', groep: 'verharding', soort: 'grind', materiaal: 'grind', kleur: 'lichtgrijs' },
+    pad: { label: 'Pad', groep: 'verharding', soort: 'pad', materiaal: 'tegels' },
+    vlonder: { label: 'Vlonder', groep: 'verharding', soort: 'vlonder', materiaal: 'hout' },
+    moestuin: { label: 'Moestuin', groep: 'beplanting', soort: 'moestuin' },
+    vijver: { label: 'Vijver', groep: 'water', soort: 'vijver' }
+  };
+  var IND_ROW_TYPES = ['terras', 'gazon', 'border', 'grind', 'pad', 'vlonder', 'moestuin', 'vijver'];
+  var IND_BAND_TYPES = ['border', 'pad', 'grind', 'gazon'];
+  var IND_ITEMS = {
+    schuur: { label: 'Schuur', groep: 'bouwwerk', w: 2.5, d: 2.5 },
+    tuinhuis: { label: 'Tuinhuis', groep: 'bouwwerk', w: 3, d: 3 },
+    speelhuis: { label: 'Speelhuis', groep: 'bouwwerk', w: 1.5, d: 1.5 },
+    pergola: { label: 'Pergola', groep: 'open_bouwwerk', w: 3, d: 3 },
+    overkapping: { label: 'Overkapping', groep: 'open_bouwwerk', w: 3, d: 3 },
+    boom: { label: 'Boom', groep: 'boom', kroon: 4 }
+  };
+  var IND_GRENS = ['schutting', 'haag', 'muur', 'hek', 'geen'];
+  var IND_KEY = 'tuinkaart.indeling.v1.';
+  var indSeq = 0, indSel = null, indDrag = null, indHist = {}, indLucht = {}, indLuchtAan = false, indRaf = 0;
+  function indId(p) { return p + (++indSeq) + Math.random().toString(36).slice(2, 5); }
+  function fmtM(x) { return (Math.round(x * 100) / 100).toFixed(2).replace('.', ',') + ' m'; }
+  function parseM(s) { var x = parseFloat(String(s || '').replace(',', '.').replace(/[^0-9.\-]/g, '')); return isFinite(x) ? x : NaN; }
+  function indTypeColor(t, extra) {
+    var T = IND_TYPES[t] || IND_TYPES.gazon;
+    return fillColor({ groep: T.groep, materiaal: (extra && extra.materiaal) || T.materiaal || '', kleur: (extra && extra.kleur) || T.kleur || '' });
+  }
+  function indStorageKey(zone) {
+    var p = state.perceelProps || {};
+    return IND_KEY + [p.kadastrale_gemeente_waarde, p.sectie, p.perceelnummer].join('-') + '.' + zone.type + '.' + state.zones.filter(function (z) { return z.type === zone.type; }).indexOf(zone);
+  }
+  function indDefault(zone) {
+    var bearing = quantBearing(zone, defaultBearing(zone)), F = frameOf(zone, bearing);
+    var M = { v: 1, bearing: bearing, rows: [], bands: { links: null, rechts: null }, grens: { links: 'schutting', rechts: 'schutting', achter: 'schutting' }, items: [], tegel: null, bron: 'standaard' };
+    if (zone.type === 'voortuin') {
+      M.rows.push({ id: indId('r'), type: 'terras', d: Math.max(0.6, Math.min(1.5, Math.round(F.D * 0.3 * 10) / 10)) });
+      M.rows.push({ id: indId('r'), type: 'border' });
+      M.grens = { links: 'geen', rechts: 'geen', achter: 'geen' };
+    } else {
+      M.rows.push({ id: indId('r'), type: 'terras', d: Math.max(1, Math.min(3.6, Math.round(F.D * 0.3 * 10) / 10)) });
+      M.rows.push({ id: indId('r'), type: 'gazon' });
+    }
+    return M;
+  }
+  function indModel(zone, maak) {
+    if (!zone) return null;
+    state.indeling = state.indeling || {};
+    var M = state.indeling[zone.id];
+    if (!M) {
+      try { var s = localStorage.getItem(indStorageKey(zone)); if (s) { M = JSON.parse(s); if (!M || !Array.isArray(M.rows) || !M.rows.length) M = null; } } catch (e) { M = null; }
+      if (!M && maak !== false) M = indDefault(zone);
+      if (M) state.indeling[zone.id] = M;
+    }
+    return M;
+  }
+  function indSave(zone, M) { try { localStorage.setItem(indStorageKey(zone), JSON.stringify(M)); } catch (e) {} }
+  function indPush(zone, M) {
+    var h = indHist[zone.id] = indHist[zone.id] || [];
+    h.push(JSON.stringify(M));
+    if (h.length > 40) h.shift();
+  }
+  // grenzen van de stroken (v-waarden), van het huis naar achteren
+  function indBounds(M, F) {
+    var out = [], v = F.vmin, n = M.rows.length;
+    M.rows.forEach(function (r, i) {
+      var start = v, end;
+      if (i === n - 1) end = F.vmax;
+      else { end = Math.min(F.vmax - 0.3 * (n - 1 - i), start + Math.max(0.3, r.d || 1)); }
+      out.push([start, end]);
+      v = end;
+    });
+    return out;
+  }
+  function indCellBounds(row, F) {
+    if (!row.cells) return null;
+    var out = [], u = F.umin, n = row.cells.length;
+    row.cells.forEach(function (c, i) {
+      var s = u, e = i === n - 1 ? F.umax : Math.min(F.umax - 0.3 * (n - 1 - i), s + Math.max(0.3, c.w || 1));
+      out.push([s, e]); u = e;
+    });
+    return out;
+  }
+  function rectUV(F, u0, v0, u1, v1) {
+    return turf.polygon([[fromUV(F, u0, v0), fromUV(F, u1, v0), fromUV(F, u1, v1), fromUV(F, u0, v1), fromUV(F, u0, v0)]]);
+  }
+  function safeDiff(a, b) { if (!a) return null; if (!b) return a; try { return turf.difference(a, b); } catch (e) { return a; } }
+  function indUnion(a, b) { if (!a) return b; if (!b) return a; try { return turf.union(a, b); } catch (e) { return a; } }
+  function indBandEdges(zone, F, side) { return sideEdges(zone, F, side); }
+  function indSpanRegion(M, F, bounds, rowIds) {
+    var reg = null;
+    M.rows.forEach(function (r, i) { if (rowIds.indexOf(r.id) !== -1) reg = indUnion(reg, rectUV(F, F.umin - 3, bounds[i][0] - (i === 0 ? 2 : 0), F.umax + 3, bounds[i][1] + (i === M.rows.length - 1 ? 2 : 0))); });
+    return reg;
+  }
+  function indItemPoly(F, it) {
+    var w = it.w || 2, d = it.d || 2;
+    return rectUV(F, it.u - w / 2, it.v - d / 2, it.u + w / 2, it.v + d / 2);
+  }
+  // Precieze vlakken voor de tekening en de kaart (alleen bij loslaten, niet tijdens het slepen).
+  function indPieces(zone, M) {
+    var F = frameOf(zone, M.bearing), bounds = indBounds(M, F), out = [];
+    var U0 = F.umin - 3, U1 = F.umax + 3;
+    var bouw = null;
+    M.items.forEach(function (it) { var I = IND_ITEMS[it.kind]; if (I && I.groep === 'bouwwerk') bouw = indUnion(bouw, indItemPoly(F, it)); });
+    var bands = {};
+    ['links', 'rechts'].forEach(function (side) {
+      var B = M.bands[side];
+      if (!B || !(B.w > 0)) return;
+      var edges = indBandEdges(zone, F, side), reg;
+      if (edges.length) { try { reg = turf.buffer(turf.multiLineString(edges.map(function (e) { return [e.a, e.b]; })), B.w, { units: 'meters', steps: 4 }); } catch (e) { reg = null; } }
+      if (!reg) reg = side === 'links' ? rectUV(F, U0, F.vmin - 2, F.umin + B.w, F.vmax + 2) : rectUV(F, F.umax - B.w, F.vmin - 2, U1, F.vmax + 2);
+      var span = indSpanRegion(M, F, bounds, B.rows || M.rows.map(function (r) { return r.id; }));
+      var g = span ? safeIntersect(reg, span) : null;
+      g = g ? safeIntersect(g, zone.geom) : null;
+      g = safeDiff(g, bouw);
+      if (g) { bands[side] = g; out.push({ key: 'band:' + side, type: B.type, geom: g, naam: IND_TYPES[B.type].label + ' ' + side, extra: B }); }
+    });
+    var allBands = indUnion(bands.links || null, bands.rechts || null);
+    M.rows.forEach(function (r, i) {
+      var b = bounds[i], v0 = i === 0 ? b[0] - 2 : b[0], v1 = i === M.rows.length - 1 ? b[1] + 2 : b[1];
+      var parts = r.cells ? indCellBounds(r, F).map(function (cb, j) { return { key: 'cell:' + r.id + ':' + r.cells[j].id, type: r.cells[j].type, u0: j === 0 ? U0 : cb[0], u1: j === r.cells.length - 1 ? U1 : cb[1], extra: r.cells[j] }; })
+        : [{ key: 'row:' + r.id, type: r.type, u0: U0, u1: U1, extra: r }];
+      parts.forEach(function (p) {
+        var g = safeIntersect(rectUV(F, p.u0, v0, p.u1, v1), zone.geom);
+        g = safeDiff(g, allBands); g = safeDiff(g, bouw);
+        if (g) out.push({ key: p.key, type: p.type, geom: g, naam: IND_TYPES[p.type].label, extra: p.extra });
+      });
+    });
+    return { F: F, bounds: bounds, pieces: out };
+  }
+  // Van de indeling naar de onderdelen die de tekening en de kaart gebruiken.
+  function indApply(zone, M) {
+    var res = indPieces(zone, M), F = res.F, nieuw = [], tel = {};
+    state.objects = state.objects.filter(function (o) { return o.zone !== zone.id; });
+    function naamVan(n) { tel[n] = (tel[n] || 0) + 1; return tel[n] > 1 ? n + ' ' + tel[n] : n; }
+    res.pieces.forEach(function (p) {
+      var a = 0; try { a = turf.area(p.geom); } catch (e) {}
+      if (a < 0.05) return;
+      var T = IND_TYPES[p.type] || IND_TYPES.gazon;
+      var o = { id: 's-' + zone.id + '-' + p.key, indKey: p.key, zone: zone.id, photos: [], src: 'stroken', groep: T.groep, soort: T.soort, naam: naamVan(p.naam),
+        materiaal: (p.extra && p.extra.materiaal) || T.materiaal || '', formaat: (p.extra && p.extra.formaat) || '', kleur: (p.extra && p.extra.kleur) || T.kleur || '', hoogte: null,
+        status: 'bevestigd', frameBearing: M.bearing, fixedGeom: p.geom, plekOnbekend: false };
+      if (p.type === 'terras' && M.tegel && !o.formaat) o.formaat = Math.round(M.tegel * 100) + 'x' + Math.round(M.tegel * 100);
+      updateGeom(o); if (o.geom) nieuw.push(o);
+    });
+    M.items.forEach(function (it) {
+      var I = IND_ITEMS[it.kind]; if (!I) return;
+      var o = { id: 's-' + zone.id + '-item:' + it.id, indKey: 'item:' + it.id, zone: zone.id, photos: [], src: 'stroken', groep: I.groep, soort: it.kind, naam: naamVan(I.label), materiaal: '', formaat: '', kleur: '', hoogte: null, status: 'bevestigd', frameBearing: M.bearing, plekOnbekend: false };
+      if (it.kind === 'boom') { o.fixedPos = fromUV(F, it.u, it.v); o.w = o.d = it.kroon || 4; }
+      else { o.fixedGeom = indItemPoly(F, it); }
+      updateGeom(o); if (o.geom || o.pos) nieuw.push(o);
+    });
+    ['links', 'rechts', 'achter'].forEach(function (side) {
+      var g = M.grens[side];
+      if (!g || g === 'geen') return;
+      var o = { id: 's-' + zone.id + '-grens:' + side, indKey: 'grens:' + side, zone: zone.id, photos: [], src: 'stroken', groep: 'erfafscheiding', soort: g, naam: cap(g) + ' ' + side, materiaal: g === 'schutting' ? 'hout' : '', formaat: '', kleur: '', status: 'bevestigd', frameBearing: M.bearing, side: side, plekOnbekend: false };
+      updateGeom(o); if (o.geom) nieuw.push(o);
+    });
+    state.objects = state.objects.concat(nieuw);
+  }
+  function indCommit(zone, M, opts) {
+    if (!opts || !opts.geenHistorie) {} // historie wordt vooraf gezet
+    indSave(zone, M);
+    indApply(zone, M);
+    renderIllustration(); renderObjects();
+    renderIndeling();
+  }
+  function indChange(fn) {
+    var zone = getZone(state.selected), M = indModel(zone);
+    if (!zone || !M) return;
+    indPush(zone, M);
+    fn(M, frameOf(zone, M.bearing), zone);
+    indCommit(zone, M);
+  }
+
+  // ---------- tekenen van de editor ----------
+  var IND_ML = 8, IND_MR = 104, IND_TOP = 28, IND_BOT = 34;
+  function indLayout(zone, M) {
+    var F = frameOf(zone, M.bearing), wrap = $('ind-wrap');
+    var cw = Math.max(280, Math.min(560, (wrap && wrap.clientWidth) || 340));
+    var availH = Math.max(300, Math.min(560, (window.innerHeight || 800) * 0.5));
+    var sc = Math.min((cw - IND_ML - IND_MR) / F.W, availH / F.D);
+    var gw = F.W * sc, gh = F.D * sc;
+    var ml = IND_ML + Math.max(0, (cw - IND_ML - IND_MR - gw) / 2);
+    return { F: F, cw: cw, sc: sc, gw: gw, gh: gh, ml: ml, H: IND_TOP + gh + IND_BOT,
+      sx: function (u) { return ml + (u - F.umin) * sc; }, sy: function (v) { return IND_TOP + (F.vmax - v) * sc; },
+      tu: function (x) { return F.umin + (x - ml) / sc; }, tv: function (y) { return F.vmax - (y - IND_TOP) / sc; } };
+  }
+  function indPath(Lo, geom) {
+    var d = '';
+    polys(geom.type === 'Feature' ? geom : { geometry: geom }).forEach(function (pg) {
+      pg.geometry.coordinates.forEach(function (ring) {
+        ring.forEach(function (p, i) { var q = toUV(Lo.F, p); d += (i ? 'L' : 'M') + Lo.sx(q[0]).toFixed(1) + ' ' + Lo.sy(q[1]).toFixed(1); });
+        d += 'Z';
+      });
+    });
+    return d;
+  }
+  function indSelEq(a, b) { return a && b && a === b; }
+  // breedste stuk tuin op diepte v (voor het plaatsen van namen)
+  function indSpanAt(zone, F, v) {
+    var xs = [];
+    polys(zone.geom).forEach(function (pg) {
+      pg.geometry.coordinates.forEach(function (ring) {
+        for (var i = 0; i < ring.length - 1; i++) {
+          var a = toUV(F, ring[i]), b = toUV(F, ring[i + 1]);
+          if ((a[1] <= v && b[1] > v) || (b[1] <= v && a[1] > v)) xs.push(a[0] + (v - a[1]) / (b[1] - a[1]) * (b[0] - a[0]));
+        }
+      });
+    });
+    xs.sort(function (p, q) { return p - q; });
+    var best = null;
+    for (var k = 0; k + 1 < xs.length; k += 2) if (!best || xs[k + 1] - xs[k] > best[1] - best[0]) best = [xs[k], xs[k + 1]];
+    return best || [F.umin, F.umax];
+  }
+  function indRowLabel(M, r) {
+    var t = r.cells ? r.cells.map(function (c) { return IND_TYPES[c.type].label; }).join(' / ') : IND_TYPES[r.type].label;
+    return t;
+  }
+  function renderIndeling() {
+    var card = $('indeel-card'), zone = getZone(state.selected);
+    if (!zone) { card.hidden = true; return; }
+    card.hidden = false;
+    var M = indModel(zone);
+    $('indeel-zone').textContent = zoneLabel(zone).toLowerCase();
+    $('ind-undo').disabled = false;
+    $('ind-luchtfoto').setAttribute('aria-pressed', indLuchtAan ? 'true' : 'false');
+    $('ind-luchtfoto').classList.toggle('on', indLuchtAan);
+    var Lo = indLayout(zone, M), F = Lo.F, bounds = indBounds(M, F), svg = $('ind-svg');
+    svg.setAttribute('width', Lo.cw); svg.setAttribute('height', Lo.H.toFixed(0));
+    svg.setAttribute('viewBox', '0 0 ' + Lo.cw + ' ' + Lo.H.toFixed(0));
+    var zp = indPath(Lo, zone.geom), s = '';
+    var x0 = Lo.ml, x1 = Lo.ml + Lo.gw, yTop = IND_TOP, yBot = IND_TOP + Lo.gh;
+    s += '<defs><clipPath id="ind-clip"><path d="' + zp + '"/></clipPath>';
+    ['links', 'rechts'].forEach(function (side) {
+      var B = M.bands[side]; if (!B) return;
+      var ids = B.rows || M.rows.map(function (r) { return r.id; }), rects = '';
+      M.rows.forEach(function (r, i) { if (ids.indexOf(r.id) === -1) return; var a = Lo.sy(bounds[i][1]), b = Lo.sy(bounds[i][0]); rects += '<rect x="0" y="' + (i === M.rows.length - 1 ? 0 : a).toFixed(1) + '" width="' + Lo.cw + '" height="' + ((i === 0 ? Lo.H : b) - (i === M.rows.length - 1 ? 0 : a)).toFixed(1) + '"/>'; });
+      s += '<clipPath id="ind-span-' + side + '">' + rects + '</clipPath>';
+    });
+    s += '</defs>';
+    // huis: de gebouwen op je perceel (BAG), anders een balk onderaan
+    var huisD = '';
+    (state.bebouwing || []).forEach(function (bd) { try { huisD += indPath(Lo, bd); } catch (e) {} });
+    if (huisD) {
+      s += '<path d="' + huisD + '" fill="#C9C2B6" stroke="#A39B8E" stroke-width="1" pointer-events="none"/>';
+      s += '<text x="' + ((x0 + x1) / 2).toFixed(1) + '" y="' + (yBot + 22).toFixed(1) + '" text-anchor="middle" class="ind-t" pointer-events="none">Huis</text>';
+    } else {
+      s += '<rect x="' + x0.toFixed(1) + '" y="' + (yBot + 6).toFixed(1) + '" width="' + Lo.gw.toFixed(1) + '" height="22" rx="4" fill="#B9B3A8"/>';
+      s += '<text x="' + ((x0 + x1) / 2).toFixed(1) + '" y="' + (yBot + 21).toFixed(1) + '" text-anchor="middle" class="ind-t ind-wit">Huis</text>';
+    }
+    // breedte bovenaan
+    s += '<text x="' + ((x0 + x1) / 2).toFixed(1) + '" y="16" text-anchor="middle" class="ind-t ind-sub">' + fmtM(F.W) + ' breed</text>';
+    s += '<g clip-path="url(#ind-clip)">';
+    s += '<rect x="0" y="0" width="' + Lo.cw + '" height="' + Lo.H.toFixed(0) + '" fill="#EFE9DA"/>';
+    var lu = indLucht[zone.id], op = indLuchtAan && lu && lu.url ? 0.45 : 1;
+    if (indLuchtAan && lu && lu.url) {
+      // luchtfoto eronder, gedraaid zodat het huis onderaan staat
+      var G = lu.G, p00 = toUV(F, luchtGeo(G, 0, 0)), p10 = toUV(F, luchtGeo(G, G.cw, 0)), p01 = toUV(F, luchtGeo(G, 0, G.ch));
+      var ax = Lo.sx(p00[0]), ay = Lo.sy(p00[1]);
+      var m = [(Lo.sx(p10[0]) - ax) / G.cw, (Lo.sy(p10[1]) - ay) / G.cw, (Lo.sx(p01[0]) - ax) / G.ch, (Lo.sy(p01[1]) - ay) / G.ch, ax, ay];
+      s += '<image href="' + lu.url + '" width="' + G.cw + '" height="' + G.ch + '" transform="matrix(' + m.map(function (x) { return x.toFixed(4); }).join(' ') + ')" preserveAspectRatio="none"/>';
+    }
+    // stroken en vakken
+    M.rows.forEach(function (r, i) {
+      var b = bounds[i], ya = i === M.rows.length - 1 ? 0 : Lo.sy(b[1]), yb = i === 0 ? Lo.H : Lo.sy(b[0]);
+      if (!r.cells) {
+        var sel = indSelEq(indSel, 'row:' + r.id);
+        s += '<rect data-sel="row:' + r.id + '" x="0" y="' + ya.toFixed(1) + '" width="' + Lo.cw + '" height="' + (yb - ya).toFixed(1) + '" fill="' + indTypeColor(r.type, r) + '" fill-opacity="' + op + '"/>';
+      } else {
+        var cbs = indCellBounds(r, F);
+        r.cells.forEach(function (c, j) {
+          var xa = j === 0 ? 0 : Lo.sx(cbs[j][0]), xb = j === r.cells.length - 1 ? Lo.cw : Lo.sx(cbs[j][1]);
+          s += '<rect data-sel="cell:' + r.id + ':' + c.id + '" x="' + xa.toFixed(1) + '" y="' + ya.toFixed(1) + '" width="' + (xb - xa).toFixed(1) + '" height="' + (yb - ya).toFixed(1) + '" fill="' + indTypeColor(c.type, c) + '" fill-opacity="' + op + '"/>';
+        });
+      }
+    });
+    ['links', 'rechts'].forEach(function (side) {
+      var B = M.bands[side]; if (!B || !(B.w > 0)) return;
+      var edges = indBandEdges(zone, F, side), d = '';
+      if (edges.length) edges.forEach(function (e) { var a = toUV(F, e.a), c = toUV(F, e.b); d += 'M' + Lo.sx(a[0]).toFixed(1) + ' ' + Lo.sy(a[1]).toFixed(1) + 'L' + Lo.sx(c[0]).toFixed(1) + ' ' + Lo.sy(c[1]).toFixed(1); });
+      else { var ux = side === 'links' ? F.umin : F.umax; d = 'M' + Lo.sx(ux).toFixed(1) + ' 0L' + Lo.sx(ux).toFixed(1) + ' ' + Lo.H.toFixed(0); }
+      s += '<g clip-path="url(#ind-span-' + side + ')"><path data-sel="band:' + side + '" d="' + d + '" fill="none" stroke="' + indTypeColor(B.type, B) + '" stroke-opacity="' + op + '" stroke-width="' + (2 * B.w * Lo.sc).toFixed(1) + '" stroke-linecap="square"/></g>';
+    });
+    // scheidslijnen
+    M.rows.forEach(function (r, i) { if (i < M.rows.length - 1) { var y = Lo.sy(bounds[i][1]); s += '<line x1="0" x2="' + Lo.cw + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>'; } });
+    // schuren, pergola's en bomen
+    M.items.forEach(function (it) {
+      var I = IND_ITEMS[it.kind]; if (!I) return;
+      var cx = Lo.sx(it.u), cy = Lo.sy(it.v), sel = indSelEq(indSel, 'item:' + it.id);
+      if (it.kind === 'boom') {
+        var r = (it.kroon || 4) / 2 * Lo.sc;
+        s += '<g data-sel="item:' + it.id + '" data-drag="item:' + it.id + '" class="ind-drag"><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + Math.max(8, r).toFixed(1) + '" fill="#2F6B3A" fill-opacity="0.55" stroke="' + (sel ? '#FFD60A' : '#1F4A27') + '" stroke-width="' + (sel ? 3 : 1.5) + '"/><circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="3" fill="#5A3E2B"/></g>';
+      } else {
+        var w = (it.w || 2) * Lo.sc, h = (it.d || 2) * Lo.sc, open = I.groep === 'open_bouwwerk';
+        s += '<g data-sel="item:' + it.id + '" data-drag="item:' + it.id + '" class="ind-drag"><rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + (open ? 'none' : '#7A6A5E') + '" stroke="' + (sel ? '#FFD60A' : (open ? '#6B4F3A' : '#4A3F36')) + '" stroke-width="' + (sel ? 3 : (open ? 3 : 1.5)) + '"' + (open ? ' stroke-dasharray="5 3"' : '') + '/>';
+        if (open) s += '<rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy - h / 2).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="#8B6B4A" fill-opacity="0.15"/>';
+        if (w > 30 && h > 16) s += '<text x="' + cx.toFixed(1) + '" y="' + (cy + 4).toFixed(1) + '" text-anchor="middle" class="ind-t' + (open ? '' : ' ind-wit') + '" pointer-events="none">' + I.label + '</text>';
+        s += '</g>';
+      }
+    });
+    // geselecteerd vlak omlijnen
+    if (indSel && /^(row|cell|band):/.test(indSel)) {
+      var el2 = null, k = indSel.split(':');
+      if (k[0] === 'row') { var ri = M.rows.findIndex(function (r) { return r.id === k[1]; }); if (ri >= 0) { var b2 = bounds[ri]; s += '<rect x="' + x0.toFixed(1) + '" y="' + Lo.sy(b2[1]).toFixed(1) + '" width="' + Lo.gw.toFixed(1) + '" height="' + ((b2[1] - b2[0]) * Lo.sc).toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; } }
+      if (k[0] === 'cell') { var rr = M.rows.find(function (r) { return r.id === k[1]; }); if (rr && rr.cells) { var bi = M.rows.indexOf(rr), cb = indCellBounds(rr, F), ci = rr.cells.findIndex(function (c) { return c.id === k[2]; }); if (ci >= 0) s += '<rect x="' + Lo.sx(cb[ci][0]).toFixed(1) + '" y="' + Lo.sy(bounds[bi][1]).toFixed(1) + '" width="' + ((cb[ci][1] - cb[ci][0]) * Lo.sc).toFixed(1) + '" height="' + ((bounds[bi][1] - bounds[bi][0]) * Lo.sc).toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; } }
+      if (k[0] === 'band') { var BB = M.bands[k[1]]; if (BB) { var ux2 = k[1] === 'links' ? F.umin : F.umax - BB.w; s += '<rect x="' + Lo.sx(ux2).toFixed(1) + '" y="' + yTop + '" width="' + (BB.w * Lo.sc).toFixed(1) + '" height="' + Lo.gh.toFixed(1) + '" fill="none" stroke="#FFD60A" stroke-width="4" pointer-events="none"/>'; } }
+    }
+    s += '</g>';
+    s += '<path d="' + zp + '" fill="none" stroke="#3B4A3F" stroke-width="2" pointer-events="none"/>';
+    // namen in de stroken
+    M.rows.forEach(function (r, i) {
+      var b = bounds[i], h = (b[1] - b[0]) * Lo.sc; if (h < 18) return;
+      var vm = (b[0] + b[1]) / 2, y = Lo.sy(vm) + 4, sp = indSpanAt(zone, F, vm).slice();
+      ['links', 'rechts'].forEach(function (side) { var B = M.bands[side]; if (B && B.w > 0 && (B.rows || []).indexOf(r.id) !== -1) { if (side === 'links') sp[0] += B.w; else sp[1] -= B.w; } });
+      if (!r.cells) { if ((sp[1] - sp[0]) * Lo.sc > 30) s += '<text x="' + Lo.sx((sp[0] + sp[1]) / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" class="ind-t" pointer-events="none">' + IND_TYPES[r.type].label + '</text>'; }
+      else indCellBounds(r, F).forEach(function (cb, j) { var a0 = Math.max(cb[0], sp[0]), a1 = Math.min(cb[1], sp[1]); if ((a1 - a0) * Lo.sc > 36) s += '<text x="' + Lo.sx((a0 + a1) / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" class="ind-t" pointer-events="none">' + IND_TYPES[r.cells[j].type].label + '</text>'; });
+    });
+    // maatketting rechts, met sleepbolletjes op de scheidslijnen
+    var mx = x1 + 18;
+    s += '<line x1="' + mx + '" x2="' + mx + '" y1="' + yTop + '" y2="' + yBot.toFixed(1) + '" stroke="#9AA39C" stroke-width="1.5"/>';
+    M.rows.forEach(function (r, i) {
+      var b = bounds[i], ya = Lo.sy(b[1]), yb = Lo.sy(b[0]), ym = (ya + yb) / 2, dd = b[1] - b[0], sel = indSelEq(indSel, 'row:' + r.id);
+      s += '<line x1="' + (mx - 5) + '" x2="' + (mx + 5) + '" y1="' + ya.toFixed(1) + '" y2="' + ya.toFixed(1) + '" stroke="#9AA39C" stroke-width="1.5"/>';
+      var tg = M.tegel ? ' · ' + (Math.round(dd / M.tegel * 10) / 10).toString().replace('.', ',') + ' t' : '';
+      s += '<g data-sel="row:' + r.id + '" class="ind-maat"><rect x="' + (mx + 8) + '" y="' + (ym - 13).toFixed(1) + '" width="' + (Lo.cw - mx - 10) + '" height="26" rx="8" fill="' + (sel ? '#FFF4C2' : '#FFFFFF') + '" stroke="' + (sel ? '#E0B800' : '#D5DAD3') + '"/>' +
+        '<text x="' + (mx + 16) + '" y="' + (ym + 4).toFixed(1) + '" class="ind-t ind-maatt">' + fmtM(dd) + '<tspan class="ind-sub">' + tg + '</tspan></text></g>';
+    });
+    M.rows.forEach(function (r, i) {
+      if (i >= M.rows.length - 1) return;
+      var y = Lo.sy(bounds[i][1]);
+      s += '<g data-drag="row:' + i + '" class="ind-drag"><circle cx="' + mx + '" cy="' + y.toFixed(1) + '" r="22" fill="transparent"/><circle cx="' + mx + '" cy="' + y.toFixed(1) + '" r="11" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
+        '<path d="M' + (mx - 4) + ' ' + (y - 2).toFixed(1) + 'l4 -4 l4 4 M' + (mx - 4) + ' ' + (y + 2).toFixed(1) + 'l4 4 l4 -4" stroke="#FFFFFF" stroke-width="1.6" fill="none"/></g>';
+    });
+    // vakgrenzen binnen een strook
+    M.rows.forEach(function (r, i) {
+      if (!r.cells) return;
+      var cbs = indCellBounds(r, F), ym = Lo.sy((bounds[i][0] + bounds[i][1]) / 2) + 16;
+      cbs.forEach(function (cb, j) {
+        if (j >= cbs.length - 1) return;
+        var x = Lo.sx(cb[1]);
+        s += '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + Lo.sy(bounds[i][1]).toFixed(1) + '" y2="' + Lo.sy(bounds[i][0]).toFixed(1) + '" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="6 4" pointer-events="none"/>';
+        s += '<g data-drag="cell:' + r.id + ':' + j + '" class="ind-drag"><circle cx="' + x.toFixed(1) + '" cy="' + ym.toFixed(1) + '" r="20" fill="transparent"/><circle cx="' + x.toFixed(1) + '" cy="' + ym.toFixed(1) + '" r="10" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
+          '<path d="M' + (x - 2).toFixed(1) + ' ' + (ym - 4).toFixed(1) + 'l-4 4 l4 4 M' + (x + 2).toFixed(1) + ' ' + (ym - 4).toFixed(1) + 'l4 4 l-4 4" stroke="#FFFFFF" stroke-width="1.6" fill="none"/></g>';
+      });
+    });
+    // randen: bolletje aan de binnenkant
+    ['links', 'rechts'].forEach(function (side) {
+      var B = M.bands[side]; if (!B) return;
+      var ids = B.rows || M.rows.map(function (r) { return r.id; }), vs = [];
+      M.rows.forEach(function (r, i) { if (ids.indexOf(r.id) !== -1) vs.push(bounds[i][0], bounds[i][1]); });
+      if (!vs.length) return;
+      var vm = (Math.min.apply(null, vs) + Math.max.apply(null, vs)) / 2, x = Lo.sx(side === 'links' ? F.umin + B.w : F.umax - B.w), y = Lo.sy(vm);
+      s += '<g data-drag="band:' + side + '" class="ind-drag"><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="20" fill="transparent"/><circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="10" fill="#2E6B4F" stroke="#FFFFFF" stroke-width="2"/>' +
+        '<path d="M' + (x - 2).toFixed(1) + ' ' + (y - 4).toFixed(1) + 'l-4 4 l4 4 M' + (x + 2).toFixed(1) + ' ' + (y - 4).toFixed(1) + 'l4 4 l-4 4" stroke="#FFFFFF" stroke-width="1.6" fill="none"/></g>';
+    });
+    svg.innerHTML = s;
+    renderIndPanel(zone, M, F, bounds);
+  }
+
+  // ---------- het paneel onder de tekening ----------
+  function chip(label, act, on, color) {
+    return '<button type="button" class="chip' + (on ? ' on' : '') + '" data-act="' + act + '">' + (color ? '<span class="chip-sw" style="background:' + color + '"></span>' : '') + label + '</button>';
+  }
+  function stepper(label, act, value, extra) {
+    return '<div class="stepper"><span class="st-label">' + label + '</span><button type="button" class="st-btn" data-act="' + act + ':-" aria-label="Kleiner">−</button>' +
+      '<input class="st-val" inputmode="decimal" data-inp="' + act + '" value="' + value + '" aria-label="' + label + '"><button type="button" class="st-btn" data-act="' + act + ':+" aria-label="Groter">+</button>' + (extra || '') + '</div>';
+  }
+  function indFind(M, sel) {
+    if (!sel) return null;
+    var k = sel.split(':');
+    if (k[0] === 'row') { var r = M.rows.find(function (x) { return x.id === k[1]; }); return r ? { kind: 'row', row: r, idx: M.rows.indexOf(r) } : null; }
+    if (k[0] === 'cell') { var r2 = M.rows.find(function (x) { return x.id === k[1]; }); if (!r2 || !r2.cells) return null; var c = r2.cells.find(function (x) { return x.id === k[2]; }); return c ? { kind: 'cell', row: r2, cell: c, idx: r2.cells.indexOf(c) } : null; }
+    if (k[0] === 'band') return M.bands[k[1]] ? { kind: 'band', side: k[1], band: M.bands[k[1]] } : null;
+    if (k[0] === 'item') { var it = M.items.find(function (x) { return x.id === k[1]; }); return it ? { kind: 'item', item: it } : null; }
+    return null;
+  }
+  function renderIndPanel(zone, M, F, bounds) {
+    var p = $('ind-panel'), f = indFind(M, indSel), h = '';
+    if (!f) {
+      indSel = null;
+      h += '<p class="note">Tik op een strook, een rand of een schuur om hem aan te passen. Sleep de groene bolletjes om maten te veranderen.</p>';
+      h += '<div class="pn-kop">Toevoegen</div><div class="chips">' + chip('+ Strook', 'add:row') + chip('+ Rand links', 'add:band:links') + chip('+ Rand rechts', 'add:band:rechts') + chip('+ Schuur', 'add:item:schuur') + chip('+ Boom', 'add:item:boom') + chip('+ Pergola', 'add:item:pergola') + '</div>';
+      h += '<div class="pn-kop">Tegelmaat (om te tellen)</div><div class="chips">' + chip('Geen', 'tegel:0', !M.tegel) + [0.3, 0.4, 0.5, 0.6].map(function (t) { return chip(Math.round(t * 100) + ' cm', 'tegel:' + t, M.tegel === t); }).join('') + '</div>';
+      ['links', 'achter', 'rechts'].forEach(function (side) {
+        h += '<div class="pn-kop">Erfgrens ' + side + '</div><div class="chips">' + IND_GRENS.map(function (g) { return chip(cap(g), 'grens:' + side + ':' + g, M.grens[side] === g); }).join('') + '</div>';
+      });
+    } else if (f.kind === 'row' || f.kind === 'cell') {
+      var r = f.row, i = M.rows.indexOf(r), b = bounds[i], d = b[1] - b[0], last = i === M.rows.length - 1;
+      var cur = f.kind === 'cell' ? f.cell : r, curType = f.kind === 'cell' ? f.cell.type : r.type;
+      h += '<div class="pn-titel">Strook ' + (i + 1) + (f.kind === 'cell' ? ', vak ' + (f.idx + 1) : '') + ' · ' + IND_TYPES[curType].label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
+      h += '<div class="chips">' + IND_ROW_TYPES.map(function (t) { return chip(IND_TYPES[t].label, 'type:' + t, curType === t, indTypeColor(t)); }).join('') + '</div>';
+      var tg = M.tegel ? '<span class="st-extra"><input class="st-val st-small" inputmode="numeric" data-inp="rowtiles" value="' + Math.round(d / M.tegel) + '" aria-label="Aantal tegels"> tegels</span>' : '';
+      h += stepper(last ? 'Diepte (rest)' : 'Diepte', 'depth', fmtM(d).replace(' m', ''), tg);
+      if (f.kind === 'cell') {
+        var cbs = indCellBounds(r, F), cw2 = cbs[f.idx][1] - cbs[f.idx][0];
+        h += stepper('Breedte', 'cellw', fmtM(cw2).replace(' m', ''));
+      }
+      h += '<div class="chips acts">';
+      if (!r.cells) h += chip('Splits in tweeën', 'split');
+      else if (r.cells.length < 3) h += chip('Nog een vak', 'split');
+      if (r.cells) h += chip('Eén vak maken', 'merge');
+      h += chip('Strook erachter', 'insert') + (M.rows.length > 1 ? chip('Strook weg', 'delrow') : '') + '</div>';
+    } else if (f.kind === 'band') {
+      var B = f.band;
+      h += '<div class="pn-titel">Rand ' + f.side + ' · ' + IND_TYPES[B.type].label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
+      h += '<div class="chips">' + IND_BAND_TYPES.map(function (t) { return chip(IND_TYPES[t].label, 'btype:' + t, B.type === t, indTypeColor(t)); }).join('') + '</div>';
+      h += stepper('Breedte', 'bandw', fmtM(B.w).replace(' m', ''));
+      var ids = B.rows || M.rows.map(function (x) { return x.id; });
+      h += '<div class="pn-kop">Loopt langs</div><div class="chips">' + M.rows.map(function (x, k) { return chip('Strook ' + (k + 1) + ' (' + indRowLabel(M, x) + ')', 'bspan:' + x.id, ids.indexOf(x.id) !== -1); }).join('') + '</div>';
+      h += '<div class="chips acts">' + chip('Rand weg', 'delband') + '</div>';
+    } else if (f.kind === 'item') {
+      var it = f.item, I = IND_ITEMS[it.kind];
+      h += '<div class="pn-titel">' + I.label + '<button type="button" class="pn-sluit" data-act="desel" aria-label="Sluiten">×</button></div>';
+      if (it.kind === 'boom') {
+        h += '<div class="pn-kop">Kruin</div><div class="chips">' + [['Klein', 2], ['Middel', 4], ['Groot', 7]].map(function (q) { return chip(q[0] + ' · ' + q[1] + ' m', 'kroon:' + q[1], it.kroon === q[1]); }).join('') + '</div>';
+        h += stepper('Kruin', 'kroonw', fmtM(it.kroon || 4).replace(' m', ''));
+      } else {
+        h += '<div class="chips">' + ['schuur', 'tuinhuis', 'speelhuis', 'pergola', 'overkapping'].map(function (k) { return chip(IND_ITEMS[k].label, 'ikind:' + k, it.kind === k); }).join('') + '</div>';
+        h += '<div class="pn-kop">Maat</div><div class="chips">' + [[2, 2], [2.5, 2.5], [3, 2.5], [3, 3], [4, 3]].map(function (q) { return chip(String(q[0]).replace('.', ',') + ' × ' + String(q[1]).replace('.', ','), 'isize:' + q[0] + ':' + q[1], it.w === q[0] && it.d === q[1]); }).join('') + chip('Draai', 'irot') + '</div>';
+        h += stepper('Breedte', 'itemw', fmtM(it.w).replace(' m', '')) + stepper('Diepte', 'itemd', fmtM(it.d).replace(' m', ''));
+      }
+      h += '<div class="pn-kop">Plek (of sleep hem)</div><div class="chips">' + [['Links achter', 'la'], ['Rechts achter', 'ra'], ['Links voor', 'lv'], ['Rechts voor', 'rv'], ['Midden', 'mm']].map(function (q) { return chip(q[0], 'ipos:' + q[1]); }).join('') + '</div>';
+      h += '<div class="chips acts">' + chip(I.label + ' weg', 'delitem') + '</div>';
+    }
+    p.innerHTML = h;
+  }
+
+  // ---------- acties ----------
+  function snapStep(M) { return M.tegel || 0.1; }
+  function roundTo(x, st) { return Math.round(x / st) * st; }
+  function setRowDepth(M, F, i, dNew) {
+    var bounds = indBounds(M, F), n = M.rows.length;
+    if (i === n - 1) { // laatste strook: de strook ervoor schuift mee
+      if (n < 2) return;
+      var total = bounds[n - 1][1] - bounds[n - 2][0];
+      var dPrev = Math.max(0.3, Math.min(total - 0.3, total - dNew));
+      M.rows[n - 2].d = Math.round(dPrev * 100) / 100;
+      return;
+    }
+    var maxD = bounds[i + 1][1] - bounds[i][0] - 0.3; // volgende strook houdt minstens 30 cm
+    if (i + 1 === n - 1) maxD = F.vmax - bounds[i][0] - 0.3;
+    var nd = Math.max(0.3, Math.min(maxD, dNew)), old = bounds[i][1] - bounds[i][0];
+    M.rows[i].d = Math.round(nd * 100) / 100;
+    if (i + 1 < n - 1) M.rows[i + 1].d = Math.round(Math.max(0.3, (M.rows[i + 1].d || (bounds[i + 1][1] - bounds[i + 1][0])) - (nd - old)) * 100) / 100;
+  }
+  function placeItem(F, it, pos) {
+    var w = it.kind === 'boom' ? (it.kroon || 4) : it.w, d = it.kind === 'boom' ? (it.kroon || 4) : it.d, m = 0.1;
+    var uL = F.umin + w / 2 + m, uR = F.umax - w / 2 - m, vV = F.vmin + d / 2 + m, vA = F.vmax - d / 2 - m;
+    if (pos === 'la') { it.u = uL; it.v = vA; } else if (pos === 'ra') { it.u = uR; it.v = vA; }
+    else if (pos === 'lv') { it.u = uL; it.v = vV + 1; } else if (pos === 'rv') { it.u = uR; it.v = vV + 1; }
+    else { it.u = (F.umin + F.umax) / 2; it.v = (F.vmin + F.vmax) / 2; }
+  }
+  function indAct(act) {
+    var zone = getZone(state.selected), M = indModel(zone);
+    if (!zone || !M) return;
+    var F = frameOf(zone, M.bearing), f = indFind(M, indSel), a = act.split(':');
+    if (a[0] === 'desel') { indSel = null; renderIndeling(); return; }
+    indChange(function (M2, F2) {
+      var g = indFind(M2, indSel);
+      switch (a[0]) {
+        case 'add':
+          if (a[1] === 'row') { var nr = { id: indId('r'), type: 'gazon' }; var li = M2.rows.length - 1, bb = indBounds(M2, F2)[li]; M2.rows[li].d = Math.max(0.3, Math.round((bb[1] - bb[0]) / 2 * 10) / 10); M2.rows.push(nr); indSel = 'row:' + nr.id; }
+          else if (a[1] === 'band') { if (!M2.bands[a[2]]) M2.bands[a[2]] = { type: 'border', w: 0.8, rows: M2.rows.filter(function (r) { return r.type !== 'terras'; }).map(function (r) { return r.id; }) }; if (!M2.bands[a[2]].rows.length) M2.bands[a[2]].rows = M2.rows.map(function (r) { return r.id; }); indSel = 'band:' + a[2]; }
+          else if (a[1] === 'item') { var I = IND_ITEMS[a[2]], it = { id: indId('i'), kind: a[2], w: I.w, d: I.d, kroon: I.kroon }; placeItem(F2, it, a[2] === 'boom' ? 'mm' : 'ra'); M2.items.push(it); indSel = 'item:' + it.id; }
+          break;
+        case 'tegel': M2.tegel = Number(a[1]) || null; break;
+        case 'grens': M2.grens[a[1]] = a[2]; break;
+        case 'type': if (g && g.kind === 'cell') g.cell.type = a[1]; else if (g) g.row.type = a[1]; break;
+        case 'depth': if (g && (g.kind === 'row' || g.kind === 'cell')) { var i = M2.rows.indexOf(g.row), b = indBounds(M2, F2)[i], st = snapStep(M2); setRowDepth(M2, F2, i, roundTo(b[1] - b[0], st) + (a[1] === '+' ? st : -st)); } break;
+        case 'cellw': if (g && g.kind === 'cell') { var cbs = indCellBounds(g.row, F2), j = g.idx, cur = cbs[j][1] - cbs[j][0]; setCellWidth(g.row, F2, j, roundTo(cur, 0.1) + (a[1] === '+' ? 0.1 : -0.1)); } break;
+        case 'split': if (g) { var row = g.row; if (!row.cells) { row.cells = [{ id: indId('c'), type: row.type, w: Math.round(F2.W / 2 * 10) / 10 }, { id: indId('c'), type: row.type === 'gazon' ? 'border' : 'gazon' }]; indSel = 'cell:' + row.id + ':' + row.cells[1].id; } else if (row.cells.length < 3) { var cb2 = indCellBounds(row, F2), lastW = cb2[cb2.length - 1][1] - cb2[cb2.length - 1][0]; row.cells[row.cells.length - 1].w = Math.max(0.3, Math.round(lastW / 2 * 10) / 10); var nc = { id: indId('c'), type: 'border' }; row.cells.push(nc); indSel = 'cell:' + row.id + ':' + nc.id; } } break;
+        case 'merge': if (g) { g.row.type = g.kind === 'cell' ? g.cell.type : g.row.cells[0].type; g.row.cells = null; indSel = 'row:' + g.row.id; } break;
+        case 'insert': if (g) { var k = M2.rows.indexOf(g.row), bk = indBounds(M2, F2)[k], half = Math.max(0.3, Math.round((bk[1] - bk[0]) / 2 * 10) / 10), nr2 = { id: indId('r'), type: 'gazon', d: half }; if (k === M2.rows.length - 1) { g.row.d = half; M2.rows.push(nr2); } else { g.row.d = half; nr2.d = Math.max(0.3, (bk[1] - bk[0]) - half); M2.rows.splice(k + 1, 0, nr2); } indSel = 'row:' + nr2.id; } break;
+        case 'delrow': if (g && M2.rows.length > 1) { var k2 = M2.rows.indexOf(g.row), bd = indBounds(M2, F2)[k2], dd = bd[1] - bd[0]; M2.rows.splice(k2, 1); if (k2 > 0 && k2 - 1 < M2.rows.length - 1) M2.rows[k2 - 1].d = (M2.rows[k2 - 1].d || 1) + dd; ['links', 'rechts'].forEach(function (s2) { var B = M2.bands[s2]; if (B && B.rows) B.rows = B.rows.filter(function (id) { return id !== g.row.id; }); }); indSel = null; } break;
+        case 'btype': if (g && g.kind === 'band') g.band.type = a[1]; break;
+        case 'bandw': if (g && g.kind === 'band') g.band.w = Math.max(0.2, Math.min(F2.W / 2, Math.round((g.band.w + (a[1] === '+' ? 0.1 : -0.1)) * 100) / 100)); break;
+        case 'bspan': if (g && g.kind === 'band') { var ids = g.band.rows || M2.rows.map(function (r) { return r.id; }), ix = ids.indexOf(a[1]); if (ix === -1) ids.push(a[1]); else if (ids.length > 1) ids.splice(ix, 1); g.band.rows = ids; } break;
+        case 'delband': if (g && g.kind === 'band') { M2.bands[g.side] = null; indSel = null; } break;
+        case 'kroon': if (g && g.kind === 'item') g.item.kroon = Number(a[1]); break;
+        case 'kroonw': if (g && g.kind === 'item') g.item.kroon = Math.max(1, Math.min(15, Math.round(((g.item.kroon || 4) + (a[1] === '+' ? 0.5 : -0.5)) * 10) / 10)); break;
+        case 'ikind': if (g && g.kind === 'item') g.item.kind = a[1]; break;
+        case 'isize': if (g && g.kind === 'item') { g.item.w = Number(a[1]); g.item.d = Number(a[2]); } break;
+        case 'irot': if (g && g.kind === 'item') { var t = g.item.w; g.item.w = g.item.d; g.item.d = t; } break;
+        case 'itemw': if (g && g.kind === 'item') g.item.w = Math.max(0.5, Math.round((g.item.w + (a[1] === '+' ? 0.1 : -0.1)) * 100) / 100); break;
+        case 'itemd': if (g && g.kind === 'item') g.item.d = Math.max(0.5, Math.round((g.item.d + (a[1] === '+' ? 0.1 : -0.1)) * 100) / 100); break;
+        case 'ipos': if (g && g.kind === 'item') placeItem(F2, g.item, a[1]); break;
+        case 'delitem': if (g && g.kind === 'item') { M2.items = M2.items.filter(function (x) { return x !== g.item; }); indSel = null; } break;
+      }
+    });
+  }
+  function setCellWidth(row, F, j, wNew) {
+    var cbs = indCellBounds(row, F), n = row.cells.length;
+    if (j === n - 1) { // laatste vak: het vak ervoor schuift mee
+      var tot = cbs[n - 1][1] - cbs[n - 2][0];
+      row.cells[n - 2].w = Math.round(Math.max(0.3, Math.min(tot - 0.3, tot - wNew)) * 100) / 100;
+      return;
+    }
+    var maxW = (j + 1 === n - 1 ? F.umax : cbs[j + 1][1]) - cbs[j][0] - 0.3, old = cbs[j][1] - cbs[j][0];
+    var nw = Math.max(0.3, Math.min(maxW, wNew));
+    row.cells[j].w = Math.round(nw * 100) / 100;
+    if (j + 1 < n - 1) row.cells[j + 1].w = Math.round(Math.max(0.3, (row.cells[j + 1].w || 1) - (nw - old)) * 100) / 100;
+  }
+  function indInput(name, val) {
+    var zone = getZone(state.selected), M = indModel(zone);
+    if (!zone || !M) return;
+    var x = parseM(val);
+    if (!isFinite(x)) { renderIndeling(); return; }
+    indChange(function (M2, F2) {
+      var g = indFind(M2, indSel); if (!g) return;
+      if (name === 'depth' && (g.kind === 'row' || g.kind === 'cell')) setRowDepth(M2, F2, M2.rows.indexOf(g.row), x);
+      else if (name === 'rowtiles' && M2.tegel && (g.kind === 'row' || g.kind === 'cell')) setRowDepth(M2, F2, M2.rows.indexOf(g.row), Math.round(x) * M2.tegel);
+      else if (name === 'cellw' && g.kind === 'cell') setCellWidth(g.row, F2, g.idx, x);
+      else if (name === 'bandw' && g.kind === 'band') g.band.w = Math.max(0.2, Math.min(F2.W / 2, x));
+      else if (name === 'kroonw' && g.kind === 'item') g.item.kroon = Math.max(1, Math.min(15, x));
+      else if (name === 'itemw' && g.kind === 'item') g.item.w = Math.max(0.5, x);
+      else if (name === 'itemd' && g.kind === 'item') g.item.d = Math.max(0.5, x);
+    });
+  }
+
+  // ---------- slepen ----------
+  function indPoint(e) {
+    var svg = $('ind-svg'), r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+    var kx = vb && vb.width ? vb.width / r.width : 1, ky = vb && vb.height ? vb.height / r.height : 1;
+    return [(e.clientX - r.left) * kx, (e.clientY - r.top) * ky];
+  }
+  function indDragStart(e) {
+    var t = e.target.closest ? e.target.closest('[data-drag]') : null;
+    if (!t) return;
+    var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
+    var svg = $('ind-svg');
+    try { svg.setPointerCapture(e.pointerId); } catch (er) {}
+    indDrag = { what: t.getAttribute('data-drag'), id: e.pointerId, start: indPoint(e), moved: false, before: JSON.stringify(M) };
+    var k = indDrag.what.split(':');
+    if (k[0] === 'item') { indSel = 'item:' + k[1]; var it = M.items.find(function (x) { return x.id === k[1]; }); if (it) indDrag.orig = [it.u, it.v]; }
+    e.preventDefault();
+  }
+  function indDragMove(e) {
+    if (!indDrag || e.pointerId !== indDrag.id) return;
+    var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
+    var pt = indPoint(e);
+    if (!indDrag.moved && Math.hypot(pt[0] - indDrag.start[0], pt[1] - indDrag.start[1]) < 4) return;
+    indDrag.moved = true;
+    var Lo = indLayout(zone, M), F = Lo.F, k = indDrag.what.split(':'), st = snapStep(M);
+    if (k[0] === 'row') {
+      var i = Number(k[1]), b = indBounds(M, F)[i], v = Lo.tv(pt[1]);
+      setRowDepth(M, F, i, roundTo(v - b[0], st));
+    } else if (k[0] === 'cell') {
+      var row = M.rows.find(function (x) { return x.id === k[1]; }), j = Number(k[2]);
+      if (row && row.cells) { var cb = indCellBounds(row, F)[j]; setCellWidth(row, F, j, roundTo(Lo.tu(pt[0]) - cb[0], 0.1)); }
+    } else if (k[0] === 'band') {
+      var B = M.bands[k[1]], u = Lo.tu(pt[0]);
+      if (B) B.w = Math.max(0.2, Math.min(F.W / 2, roundTo(k[1] === 'links' ? u - F.umin : F.umax - u, 0.1)));
+    } else if (k[0] === 'item') {
+      var it = M.items.find(function (x) { return x.id === k[1]; });
+      if (it && indDrag.orig) {
+        it.u = Math.round((indDrag.orig[0] + (pt[0] - indDrag.start[0]) / Lo.sc) * 10) / 10;
+        it.v = Math.round((indDrag.orig[1] - (pt[1] - indDrag.start[1]) / Lo.sc) * 10) / 10;
+        it.u = Math.max(F.umin, Math.min(F.umax, it.u)); it.v = Math.max(F.vmin, Math.min(F.vmax, it.v));
+      }
+    }
+    if (!indRaf) indRaf = (window.requestAnimationFrame || setTimeout)(function () { indRaf = 0; renderIndeling(); });
+    e.preventDefault();
+  }
+  function indDragEnd(e) {
+    if (!indDrag || (e && e.pointerId !== indDrag.id)) return;
+    var d = indDrag; indDrag = null;
+    var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
+    if (d.moved) {
+      var h = indHist[zone.id] = indHist[zone.id] || []; h.push(d.before); if (h.length > 40) h.shift();
+      indSkipClick = Date.now();
+      indCommit(zone, M);
+    } else if (/^item:/.test(d.what)) { indSel = d.what; renderIndeling(); indSkipClick = Date.now(); }
+  }
+  var indSkipClick = 0;
+  (function () {
+    var svg = $('ind-svg');
+    svg.addEventListener('pointerdown', indDragStart);
+    svg.addEventListener('pointermove', indDragMove);
+    svg.addEventListener('pointerup', indDragEnd);
+    svg.addEventListener('pointercancel', indDragEnd);
+    // niet de pagina laten scrollen als je een bolletje of schuur sleept
+    svg.addEventListener('touchstart', function (e) { var t = e.target.closest ? e.target.closest('[data-drag]') : null; if (t) e.preventDefault(); }, { passive: false });
+    svg.addEventListener('click', function (e) {
+      if (Date.now() - indSkipClick < 350) return;
+      var t = e.target.closest ? e.target.closest('[data-sel]') : null;
+      indSel = t ? t.getAttribute('data-sel') : null;
+      renderIndeling();
+      if (indSel) indPanelInView();
+    });
+    $('ind-panel').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act]') : null;
+      if (b) indAct(b.getAttribute('data-act'));
+    });
+    $('ind-panel').addEventListener('change', function (e) {
+      var i = e.target.getAttribute && e.target.getAttribute('data-inp');
+      if (i) indInput(i, e.target.value);
+    });
+    $('ind-panel').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-inp')) { e.preventDefault(); e.target.blur(); } });
+    $('ind-undo').addEventListener('click', function () {
+      var zone = getZone(state.selected); if (!zone) return;
+      var h = indHist[zone.id] || [];
+      if (!h.length) { indStatus('Er is niets meer om ongedaan te maken.'); return; }
+      try { state.indeling[zone.id] = JSON.parse(h.pop()); } catch (er) { return; }
+      if (indSel && !indFind(state.indeling[zone.id], indSel)) indSel = null;
+      indCommit(zone, state.indeling[zone.id]);
+    });
+    $('ind-opnieuw').addEventListener('click', function () {
+      var zone = getZone(state.selected), M = indModel(zone); if (!zone || !M) return;
+      indPush(zone, M);
+      state.indeling[zone.id] = indDefault(zone); indSel = null;
+      indCommit(zone, state.indeling[zone.id]);
+      indStatus('Opnieuw begonnen. Met "Ongedaan maken" krijg je je vorige indeling terug.');
+    });
+    $('ind-luchtfoto').addEventListener('click', function () {
+      indLuchtAan = !indLuchtAan;
+      var zone = getZone(state.selected);
+      if (indLuchtAan && zone && !indLucht[zone.id]) {
+        indLucht[zone.id] = { status: 'laden' };
+        indStatus('Luchtfoto ophalen…');
+        Promise.resolve().then(function () { return luchtCrop(zone); }).then(function (G) {
+          indLucht[zone.id] = { G: G, url: G.canvas.toDataURL('image/jpeg', 0.85) };
+          indStatus('');
+          renderIndeling();
+        }).catch(function () { indLucht[zone.id] = null; indLuchtAan = false; indStatus('De luchtfoto kon niet worden geladen.'); renderIndeling(); });
+      }
+      renderIndeling();
+    });
+    window.addEventListener('resize', function () { if (state.selected) renderIndeling(); });
+  })();
+  function indPanelInView() {
+    var pn = $('ind-panel'); if (!pn || !pn.getBoundingClientRect) return;
+    var top = pn.getBoundingClientRect().top, vh = window.innerHeight || 800;
+    if (top > vh - 140) window.scrollBy({ top: top - vh * 0.5, behavior: 'smooth' });
+  }
+  function luchtGeo(G, x, y) { var ll = map.unproject(L.point(G.x0 + x, G.y0 + y), G.Z); return [ll.lng, ll.lat]; }
+  function indStatus(t) { $('ind-status').textContent = t || ''; }
+
+  // ---------- indeling uit een foto ----------
+  var IND_PROMPT = [
+    'Je krijgt een foto van een Nederlandse tuin. Beschrijf de INDELING van de tuin, niet de plek van dingen in de foto.',
+    'Denk de tuin als stroken vanaf het huis naar achteren. Meestal is de foto vanaf het huis of de achterdeur de tuin in genomen.',
+    '- genomen_vanaf: "huis" (vanaf het huis de tuin in kijkend) of "achterkant" (vanaf achter in de tuin naar het huis kijkend).',
+    '- stroken: van het huis naar achteren. Per strook: type (terras, gazon, border, grind, pad, vlonder, moestuin of vijver), deel = welk deel van de tuindiepte (alle delen samen 1), en voor verharding materiaal en kleur. Liggen er in één strook naast elkaar verschillende dingen (bijvoorbeeld links grind en rechts gazon)? Geef dan ook vakken: van links naar rechts, met type en breedte_deel (samen 1).',
+    '- randen: border, pad of grind die langs de linker- of rechterschutting loopt: type, breedte_m (schatting in meters), vanaf_strook en tot_strook (0 = de strook bij het huis).',
+    '- grenzen: wat er links, rechts en achter op de erfgrens staat: schutting, haag, muur, hek of geen.',
+    '- objecten: alleen vaste dingen: schuur, tuinhuis, speelhuis, pergola, overkapping of boom. Met plek (links_voor, midden_voor, rechts_voor, links_midden, midden, rechts_midden, links_achter, midden_achter, rechts_achter), en breedte_m en diepte_m voor gebouwen of kroon_m voor bomen.',
+    '- tegel_cm: de maat van de terrastegels als je die kunt inschatten (30, 40, 50 of 60), anders 0.',
+    'Links en rechts zoals je ze op de foto ziet. Negeer losse spullen (tuinmeubels, speelgoed, fietsen, potten, mensen, dieren). Schat liever ruw dan niets. Antwoord alleen met JSON.'
+  ].join('\n');
+  var IND_T = { type: 'STRING', format: 'enum', enum: ['terras', 'gazon', 'border', 'grind', 'pad', 'vlonder', 'moestuin', 'vijver'] };
+  var IND_PLEK = { type: 'STRING', format: 'enum', enum: ['links_voor', 'midden_voor', 'rechts_voor', 'links_midden', 'midden', 'rechts_midden', 'links_achter', 'midden_achter', 'rechts_achter'] };
+  var IND_G = { type: 'STRING', format: 'enum', enum: IND_GRENS };
+  var IND_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+      genomen_vanaf: { type: 'STRING', format: 'enum', enum: ['huis', 'achterkant'] },
+      stroken: { type: 'ARRAY', items: { type: 'OBJECT', properties: { type: IND_T, deel: { type: 'NUMBER' }, materiaal: { type: 'STRING' }, kleur: { type: 'STRING' },
+        vakken: { type: 'ARRAY', items: { type: 'OBJECT', properties: { type: IND_T, breedte_deel: { type: 'NUMBER' } }, required: ['type'] } } }, required: ['type', 'deel'] } },
+      randen: { type: 'OBJECT', properties: { links: { type: 'OBJECT', properties: { type: IND_T, breedte_m: { type: 'NUMBER' }, vanaf_strook: { type: 'NUMBER' }, tot_strook: { type: 'NUMBER' } } }, rechts: { type: 'OBJECT', properties: { type: IND_T, breedte_m: { type: 'NUMBER' }, vanaf_strook: { type: 'NUMBER' }, tot_strook: { type: 'NUMBER' } } } } },
+      grenzen: { type: 'OBJECT', properties: { links: IND_G, rechts: IND_G, achter: IND_G } },
+      objecten: { type: 'ARRAY', items: { type: 'OBJECT', properties: { type: { type: 'STRING', format: 'enum', enum: ['schuur', 'tuinhuis', 'speelhuis', 'pergola', 'overkapping', 'boom'] }, plek: IND_PLEK, breedte_m: { type: 'NUMBER' }, diepte_m: { type: 'NUMBER' }, kroon_m: { type: 'NUMBER' } }, required: ['type'] } },
+      tegel_cm: { type: 'NUMBER' }
+    },
+    required: ['stroken']
+  };
+  function indFromAi(zone, res) {
+    var bearing = quantBearing(zone, defaultBearing(zone)), F = frameOf(zone, bearing);
+    var M = indDefault(zone); M.bron = 'foto'; M.rows = []; M.items = [];
+    var achter = res.genomen_vanaf === 'achterkant';
+    var flip = function (s) { return achter ? (s === 'links' ? 'rechts' : s === 'rechts' ? 'links' : s) : s; };
+    var str = (Array.isArray(res.stroken) ? res.stroken : []).filter(function (s) { return s && IND_TYPES[s.type]; });
+    if (achter) str = str.slice().reverse();
+    if (!str.length) return null;
+    var tegel = [30, 40, 50, 60].indexOf(Math.round(Number(res.tegel_cm))) !== -1 ? Math.round(Number(res.tegel_cm)) / 100 : null;
+    M.tegel = tegel;
+    var sum = str.reduce(function (a, s) { return a + Math.max(0.05, Number(s.deel) || 0.25); }, 0), st = tegel || 0.1;
+    str.forEach(function (s, i) {
+      var r = { id: indId('r'), type: s.type };
+      if (i < str.length - 1) r.d = Math.round(Math.max(0.3, roundTo(Math.max(0.05, Number(s.deel) || 0.25) / sum * F.D, st)) * 100) / 100;
+      if (s.materiaal) r.materiaal = String(s.materiaal); if (s.kleur) r.kleur = String(s.kleur);
+      var vk = (Array.isArray(s.vakken) ? s.vakken : []).filter(function (v) { return v && IND_TYPES[v.type]; });
+      if (achter) vk = vk.slice().reverse();
+      if (vk.length > 1) {
+        var vs = vk.reduce(function (a, v) { return a + Math.max(0.05, Number(v.breedte_deel) || 0.5); }, 0);
+        r.cells = vk.slice(0, 3).map(function (v, j, arr) { var c = { id: indId('c'), type: v.type }; if (j < arr.length - 1) c.w = Math.max(0.3, Math.round(Math.max(0.05, Number(v.breedte_deel) || 0.5) / vs * F.W * 10) / 10); return c; });
+      }
+      M.rows.push(r);
+    });
+    var rd = res.randen || {};
+    ['links', 'rechts'].forEach(function (side) {
+      var b = rd[achter ? flip(side) : side];
+      if (!b || !IND_TYPES[b.type] || !(Number(b.breedte_m) > 0)) return;
+      var n = M.rows.length, a0 = Math.max(0, Math.min(n - 1, Math.round(Number(b.vanaf_strook) || 0))), a1 = Math.max(a0, Math.min(n - 1, isFinite(Number(b.tot_strook)) ? Math.round(Number(b.tot_strook)) : n - 1));
+      if (achter) { var t0 = n - 1 - a1, t1 = n - 1 - a0; a0 = t0; a1 = t1; }
+      M.bands[side] = { type: IND_BAND_TYPES.indexOf(b.type) !== -1 ? b.type : 'border', w: Math.max(0.3, Math.min(F.W / 2, Math.round(Number(b.breedte_m) * 10) / 10)), rows: M.rows.slice(a0, a1 + 1).map(function (r) { return r.id; }) };
+    });
+    var gr = res.grenzen || {};
+    M.grens = { links: IND_GRENS.indexOf(gr[flip('links')]) !== -1 ? gr[flip('links')] : M.grens.links, rechts: IND_GRENS.indexOf(gr[flip('rechts')]) !== -1 ? gr[flip('rechts')] : M.grens.rechts, achter: !achter && IND_GRENS.indexOf(gr.achter) !== -1 ? gr.achter : M.grens.achter };
+    (Array.isArray(res.objecten) ? res.objecten : []).slice(0, 8).forEach(function (o) {
+      var I = IND_ITEMS[o.type]; if (!I) return;
+      var it = { id: indId('i'), kind: o.type };
+      if (o.type === 'boom') it.kroon = Math.max(1.5, Math.min(12, Number(o.kroon_m) || 4));
+      else { it.w = Math.max(1, Math.min(8, Number(o.breedte_m) || I.w)); it.d = Math.max(1, Math.min(8, Number(o.diepte_m) || I.d)); }
+      var plek = String(o.plek || 'rechts_achter').split('_'), lr = plek.length > 1 ? plek[0] : 'midden', va = plek.length > 1 ? plek[1] : plek[0];
+      if (plek[0] === 'midden' && plek.length === 1) { lr = 'midden'; va = 'midden'; }
+      if (achter) { lr = flip(lr); va = va === 'voor' ? 'achter' : va === 'achter' ? 'voor' : va; }
+      var w = o.type === 'boom' ? it.kroon : it.w, d = o.type === 'boom' ? it.kroon : it.d;
+      it.u = lr === 'links' ? F.umin + w / 2 + 0.1 : lr === 'rechts' ? F.umax - w / 2 - 0.1 : (F.umin + F.umax) / 2;
+      it.v = va === 'voor' ? F.vmin + Math.max(d / 2 + 0.5, F.D * 0.2) : va === 'achter' ? F.vmax - d / 2 - 0.1 : (F.vmin + F.vmax) / 2;
+      M.items.push(it);
+    });
+    return M;
+  }
+  $('ind-foto').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    var zone = getZone(state.selected);
+    if (!file || !zone) return;
+    if (!getKey()) { indStatus('Voeg eerst je Gemini-sleutel toe (verderop op de pagina). Je kunt ook zelf indelen.'); var kc = $('key-card'); if (kc && kc.scrollIntoView) kc.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    var url = URL.createObjectURL(file), t0 = Date.now(), tik = setInterval(function () { indStatus('Je foto wordt bekeken… ' + Math.round((Date.now() - t0) / 1000) + ' s'); }, 1000);
+    indStatus('Je foto wordt bekeken…');
+    encodeImage(url, 1024).then(function (img) {
+      return callGemini(img, { prompt: IND_PROMPT, schema: IND_SCHEMA, timeout: 90000, check: function (o) { return o && Array.isArray(o.stroken) && o.stroken.length > 0; } });
+    }).then(function (res) {
+      clearInterval(tik);
+      var M = indFromAi(zone, res || {});
+      if (!M) { indStatus('Er kwam geen bruikbare indeling uit de foto. Deel hem zelf in, of probeer een foto met meer van de tuin erop.'); return; }
+      var oud = indModel(zone); if (oud) indPush(zone, oud);
+      state.indeling[zone.id] = M; indSel = null;
+      indCommit(zone, M);
+      var wat = M.rows.map(function (r) { return indRowLabel(M, r).toLowerCase(); });
+      ['links', 'rechts'].forEach(function (s) { if (M.bands[s]) wat.push(IND_TYPES[M.bands[s].type].label.toLowerCase() + ' ' + s); });
+      M.items.forEach(function (it) { wat.push(IND_ITEMS[it.kind].label.toLowerCase()); });
+      indStatus('Indeling gemaakt uit je foto: ' + wat.join(', ') + '. Klopt een maat niet? Tik op de strook of sleep de bolletjes.');
+    }).catch(function (err) {
+      clearInterval(tik);
+      indStatus(err && err.message === 'geen-sleutel' ? 'Voeg eerst je Gemini-sleutel toe.' : 'Uitlezen lukte niet: ' + friendlyError(err));
+    }).then(function () { setTimeout(function () { URL.revokeObjectURL(url); }, 2000); });
+  });
+
+  function indApplyAll() { if (!state.indeling) return; state.zones.forEach(function (z) { var M = state.indeling[z.id]; if (M) indApply(z, M); }); }
+  function indShow() {
+    var zone = getZone(state.selected);
+    if (zone) {
+      var M = indModel(zone);
+      if (!state.objects.some(function (o) { return o.zone === zone.id && o.src === 'stroken'; })) { indApply(zone, M); renderIllustration(); renderObjects(); }
+    }
+    renderIndeling();
+  }
+  function indSelectObj(o, scroll) {
+    if (!o || !o.indKey) return;
+    indSel = /^grens:/.test(o.indKey) ? null : o.indKey;
+    renderIndeling();
+    if (scroll !== false && $('indeel-card').scrollIntoView) $('indeel-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // ================= vakken op de kaart aanpassen =================
   // Elk vak (gazon, pad, terras, border...) staat ook op de kaart. Tik erop en sleep de hoekpunten, net als bij de perceelgrens.
   var vakEdit = null;
@@ -2645,6 +3464,7 @@
   function startVakEdit(id, scroll) {
     var o = getObj(id);
     if (!o) return;
+    if (o.src === 'stroken') { indSelectObj(o); return; }
     if (o.bagIdx !== undefined) { setStatus('Dit gebouw komt uit de BAG en heeft een vaste vorm.'); return; }
     if (o.groep === 'erfafscheiding') { state.selObj = o.id; state.editObj = o.id; renderObjects(); setStatus('Een erfafscheiding volgt de erfgrens. Pas de naam of het materiaal aan in de lijst onderaan.'); return; }
     finishVak(); stopDraw();
@@ -2822,7 +3642,7 @@
   window.__tuinkaart = {
     getState: function () { return state; }, addFiles: addFiles, selectZone: selectZone, map: map,
     setEncoder: function (f) { encodeImage = f; }, models: MODELS,
-    vak: { start: function (id, sc) { startVakEdit(id, sc); }, finish: function (b) { finishVak(b); }, edit: function () { return vakEdit; }, draw: function (g) { startDraw(g); }, layer: vakLayer }, dbg: { makeCam: makeCam, projectCam: projectCam, backCam: backCam, frameOf: frameOf, sideSamples: sideSamples, toUV: toUV, fromUV: fromUV, getZone: getZone, quantBearing: quantBearing, defaultBearing: defaultBearing }
+    ind: { model: function () { var z = getZone(state.selected); return z ? indModel(z) : null; }, sel: function (k) { if (k !== undefined) { indSel = k; renderIndeling(); } return indSel; }, act: function (a) { indAct(a); }, input: function (n, v) { indInput(n, v); }, fromAi: function (r) { var z = getZone(state.selected); return indFromAi(z, r); }, pieces: function () { var z = getZone(state.selected); return indPieces(z, indModel(z)); } }, vak: { start: function (id, sc) { startVakEdit(id, sc); }, finish: function (b) { finishVak(b); }, edit: function () { return vakEdit; }, draw: function (g) { startDraw(g); }, layer: vakLayer }, dbg: { makeCam: makeCam, projectCam: projectCam, backCam: backCam, frameOf: frameOf, sideSamples: sideSamples, toUV: toUV, fromUV: fromUV, getZone: getZone, quantBearing: quantBearing, defaultBearing: defaultBearing }
   };
 })();
 </script>
